@@ -1,3 +1,0 @@
-#!/bin/bash
-xhost + >/dev/null 2>/dev/null
-su -c "chromium-launcher "$@"" guest

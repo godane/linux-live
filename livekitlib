@@ -12,6 +12,7 @@ debug_start()
 {
    if grep -q debug /proc/cmdline; then
       DEBUG_IS_ENABLED=1
+      set -x
    else
       DEBUG_IS_ENABLED=
    fi
@@ -117,7 +118,7 @@ create_bundle()
 {
    debug_log "create_module" "$*"
    rm -f "$2" # overwrite, never append to existing file
-   mksquashfs "$1" "$2" -comp xz -b 512K $3 $4 $5 $6 $7 $8 $9>/dev/null
+   mksquashfs "$1" "$2" -comp xz -b 1024K -always-use-fragments $3 $4 $5 $6 $7 $8 $9>/dev/null
 }
 
 
@@ -165,7 +166,7 @@ modprobe_everything()
    echo_green_star >&2
    echo "Probing for hardware" >&2
 
-   find /lib/modules/ | fgrep .ko | egrep $1 $2 | xargs -n 1 modprobe 2>/dev/null
+   find /lib/modules/ | fgrep .ko | egrep $1 $2 | sed -r "s:^.*/|[.]ko\$::g" | xargs -n 1 modprobe 2>/dev/null
    refresh_devs
 }
 
@@ -204,7 +205,7 @@ init_zram()
    if [ -r /sys/block/zram0/disksize ]; then
       echo 536870912 > /sys/block/zram0/disksize # 512MB
       mkswap /dev/zram0 >/dev/null
-      swapon /dev/zram0 -p 32767
+      swapon /dev/zram0
       echo 100 > /proc/sys/vm/swappiness
    fi
 }
@@ -277,37 +278,71 @@ mounted_dir()
 }
 
 
+# Get device tag.
+# $1 = device
+# $2 = tag name, such as TYPE, LABEL, UUID, etc
+#
+device_tag()
+{
+   blkid -s $2 "$1" | sed -r "s/^[^=]+=//" | tr -d '"'
+}
+
+
 # Make sure to mount FAT12/16/32 using vfat
 # in order to support long filenames
 # $1 = device
+# $2 = prefix to add, like -t
 #
 device_bestfs()
 {
    debug_log "device_bestfs" "$*"
    local FS
 
-   FS="$(blkid "$1" | sed -r "s/.*TYPE=//" | tr -d '"' | tr [A-Z] [a-z])"
+   FS="$(device_tag "$1" TYPE | tr [A-Z] [a-z])"
    if [ "$FS" = "msdos" -o "$FS" = "fat" -o "$FS" = "vfat" ]; then
       FS="vfat"
    elif [ "$FS" = "ntfs" ]; then
       FS="ntfs-3g"
    fi
-   echo "-t $FS"
+
+   if [ "$2" != "" ]; then
+      echo -n "$2"
+   fi
+
+   echo "$FS"
 }
 
 
-# Filesystem options for mount
-# $1 = filesystem or '-t filesystem'
+# Filesystem options for initial mount
+# $1.. = filesystem
 #
 fs_options()
 {
    debug_log "fs_options" "$*"
 
-   if [ "$1" = "-t" ]; then
-      shift
+   if [ "$1" != "ntfs-3g" ]; then
+      echo -n "-t $1 "
    fi
+
+   echo -n "-o rw"
+
    if [ "$1" = "vfat" ]; then
-      echo "-o check=s,shortname=mixed,iocharset=utf8"
+      echo ",check=s,shortname=mixed,iocharset=utf8"
+   fi
+}
+
+
+# Mount command for given filesystem
+# $1.. = filesystem
+#
+mount_command()
+{
+   debug_log "mount_command" "$*"
+
+   if [ "$1" = "ntfs-3g" ]; then
+      echo "@mount.ntfs-3g"
+   else
+      echo "mount"
    fi
 }
 
@@ -430,7 +465,7 @@ download_data_pxe()
 
       init_network_ip
 
-      echo "* Downloading PXE file list"
+      echo "* Downloading PXE file list" >&2
 
       PROTOCOL=http
       wget -q -O "$1/PXEFILELIST" "http://$SERVER:$PORT/PXEFILELIST?$(uname -r):$(uname -m)"
@@ -440,7 +475,7 @@ download_data_pxe()
          tftp -g -r PXEFILELIST -l "$1/PXEFILELIST" $SERVER
       fi
 
-      echo "* Downloading files from the list"
+      echo "* Downloading files from the list" >&2
 
       cat "$1/PXEFILELIST" | while read FILE; do
          if [ "$PROTOCOL" = "http" ]; then
@@ -465,18 +500,19 @@ find_data_try()
 {
    debug_log "find_data_try" "$*"
 
-   local DEVICE FS FROM OPTIONS
+   local DEVICE FS FROM OPTIONS MOUNT
 
    mkdir -p "$1"
    blkid | sort | cut -d: -f 1 | grep -E -v "/loop|/ram|/zram" | while read DEVICE; do
       FROM="$2"
       FS="$(device_bestfs "$DEVICE")"
       OPTIONS="$(fs_options $FS)"
-      mount -r "$DEVICE" "$1" $FS $OPTIONS 2>/dev/null
+      MOUNT="$(mount_command $FS)"
+
+      $MOUNT "$DEVICE" "$1" $OPTIONS 2>/dev/null
 
       # if the FROM parameter is actual file, mount it again as loop (eg. iso)
       if [ -f "$1/$FROM" ]; then
-         mount -o remount,rw "$DEVICE" "$1" 2>/dev/null
          mkdir -p "$1/../iso"
          mount -o loop,ro "$1/$FROM" "$1/../iso" 2>/dev/null
          FROM="../iso/$LIVEKITNAME"
@@ -485,7 +521,6 @@ find_data_try()
       # search for bundles in the mounted directory
       if [ "$(find "$1/$FROM" -maxdepth 1 -name "*.$BEXT" 2>/dev/null)" != "" ]; then
          # we found at least one bundle/module here
-         mount -o remount,rw "$DEVICE" "$1" 2>/dev/null
          echo "$1/$FROM" | tr -s "/" | sed -r "s:/[^/]+/[.][.]/:/:g"
          return
       fi
@@ -561,7 +596,7 @@ persistent_changes()
 {
    debug_log "persistent_changes" "$*"
 
-   local CHANGES T1 T2
+   local CHANGES T1 T2 EXISTS
 
    CHANGES="$1/$(basename "$2")"
    T1="$CHANGES/.empty"
@@ -591,20 +626,29 @@ persistent_changes()
    chmod -x "$T1" 2>/dev/null && test ! -x "$T1" && \
    rm "$T1" "$T2" 2>/dev/null
 
-   if [ $? -ne 0 ]; then
-      echo "* Activating dynamic sized storage for persistent changes"
-      rm "$T1" "$T2" 2>/dev/null
-
-      @mount.dynfilefs "$CHANGES/changes.dat" 4000 "$2"
-      if [ "$(device_bestfs "$2/loop.fs" | tr -d " ")" = "-t" ]; then
-         mke2fs -F "$2/loop.fs" >/dev/null
-      fi
-      mount -o loop,sync "$2/loop.fs" "$2"
-      rmdir "$2/lost+found" 2>/dev/null
-   else
+   if [ $? -eq 0 ]; then
       echo "* Activating native persistent changes"
       mount --bind "$CHANGES" "$2"
+      return
    fi
+
+   if [ -e "$CHANGES/changes.dat" ]; then
+      echo "* Restoring persistent changes"
+      EXISTS="true"
+   else
+      echo "* Creating new persistent changes"
+      EXISTS=""
+   fi
+
+   @mount.dynfilefs "$CHANGES/changes.dat" 4000 "$2"
+   if [ ! "$EXISTS" ]; then
+      mke2fs -F "$2/loop.fs" >/dev/null 2>&1
+   fi
+   mount -o loop,sync "$2/loop.fs" "$2"
+
+   # if test failed at any point, we may have temp files left behind
+   rm "$T1" "$T2" 2>/dev/null
+   rmdir "$2/lost+found" 2>/dev/null
 }
 
 
@@ -717,18 +761,39 @@ union_append_bundles()
 
 # Create empty fstab properly
 # $1 = root directory
+# $2 = directory where boot disk is mounted
 #
 fstab_create()
 {
    debug_log "fstab_create" "$*"
 
-   local FSTAB
+   local FSTAB DEVICE FS LABEL BOOTDEVICE OPTS
+
    FSTAB="$1/etc/fstab"
    echo aufs / aufs defaults 0 0 > $FSTAB
    echo proc /proc proc defaults 0 0 >> $FSTAB
    echo sysfs /sys sysfs defaults 0 0 >> $FSTAB
    echo devpts /dev/pts devpts gid=5,mode=620 0 0 >> $FSTAB
    echo tmpfs /dev/shm tmpfs defaults 0 0 >> $FSTAB
+
+   if grep -vq automount /proc/cmdline; then
+      return
+   fi
+
+   BOOTDEVICE=$(df "$2" | tail -n 1 | cut -d " " -f 1)
+
+   echo >> $FSTAB
+
+   blkid | grep -v "^/dev/loop" | grep -v "^/dev/zram" | cut -d: -f 1 | while read DEVICE; do
+      FS="$(device_bestfs $DEVICE)"
+      LABEL="$(basename $DEVICE)"
+      OPTS="defaults,noatime,nofail,x-systemd.device-timeout=10"
+
+      if [ "$FS" != "" -a "$FS" != "swap" -a "$FS" != "squashfs" -a "$DEVICE" != "$BOOTDEVICE" ]; then
+         mkdir -p "$1/media/$LABEL"
+         echo "$DEVICE" "/media/$LABEL" $FS $OPTS 0 0 >> $FSTAB
+      fi
+   done
 }
 
 
@@ -754,7 +819,7 @@ change_root()
    cd "$1"
 
    # make sure important device files and directories are in union
-   mkdir -p boot dev proc sys tmp mnt run
+   mkdir -p boot dev proc sys tmp media mnt run
    chmod 1777 tmp
    if [ ! -e dev/console ]; then mknod dev/console c 5 1; fi
    if [ ! -e dev/tty ]; then mknod dev/tty c 5 0; fi

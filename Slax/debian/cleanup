@@ -5,6 +5,8 @@ rm -f /etc/mtab
 rm -f /etc/apt/sources.list~
 rm -Rf /etc/systemd/system/timers.target.wants
 rm -f /etc/systemd/system/multi-user.target.wants/ssh.service
+rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service
+
 rm -f /etc/ssh/ssh_host*
 
 rm -f /var/backups/*
@@ -32,6 +34,7 @@ rm -Rf /usr/share/doc/*
 rm -Rf /usr/share/info/*
 rm -f /usr/share/images/fluxbox/debian-squared.jpg
 rm -Rf /usr/share/fluxbox/nls/??*
+rm -Rf /usr/share/gnome/help
 
 rm -Rf /usr/share/locale/??
 rm -Rf /usr/share/locale/??_*
@@ -43,6 +46,17 @@ rm -Rf /usr/share/man/*_*
 
 rm -Rf /usr/share/icons/elementaryXubuntu-dark
 rm -Rf /usr/share/icons/gnome/256x256
+
+rm /usr/share/applications/compton.desktop
+rm /usr/share/applications/debian-uxterm.desktop
+rm /usr/share/applications/debian-xterm.desktop
+rm /usr/share/applications/htop.desktop
+rm /usr/share/applications/mc.desktop
+rm /usr/share/applications/mcedit.desktop
+rm /usr/share/applications/pcmanfm-desktop-pref.desktop
+rm /usr/share/applications/python2.7.desktop
+rm /usr/share/applications/vim.desktop
+
 
 
 # Unzip gzipped files (man pages), so LZMA can compress 2times better.
@@ -63,7 +77,6 @@ uncompress_files()
 
 uncompress_files /etc/alternatives
 uncompress_files /usr/share/man
-
 
 # remove broken links
 # $1 = search directory
