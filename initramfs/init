@@ -85,7 +85,9 @@ if [ ! -z "$user" ]; then
 		#chroot $UNION /usr/sbin/usermod -G wheel,audio,cdrom,floppy,plugdev,video,power,netdev,lp,scanner,kmem $user
 		chroot $UNION useradd -m -g users -s /bin/bash $user
 		chroot $UNION useradd -m -g users -s /bin/bash $user
-		chroot $UNION usermod -G audio,cdrom,floppy,plugdev,video,netdev,lp,scanner,kmem,sudo $user
+		chroot $UNION usermod -G audio,cdrom,floppy,plugdev,video,netdev,lp,kmem,sudo $user
+		#if this is added with kali linux it would fail the all groups so best to do it by itself
+		chroot $UNION usermod -G scanner $user
 		debug_shell
 		echo "Setting up $user password"
 		echo "$user:$user" > $UNION/tmp/chpasswd.tmp
