@@ -79,6 +79,7 @@ copy_including_deps /$LMK/kernel/fs/ext2
 copy_including_deps /$LMK/kernel/fs/ext3
 copy_including_deps /$LMK/kernel/fs/ext4
 copy_including_deps /$LMK/kernel/fs/fat
+copy_including_deps /$LMK/kernel/fs/btrfs
 copy_including_deps /$LMK/kernel/fs/nls
 copy_including_deps /$LMK/kernel/fs/fuse
 copy_including_deps /$LMK/kernel/fs/isofs
@@ -120,7 +121,7 @@ fi
 
 # copy all custom-built modules
 copy_including_deps /$LMK/updates
-
+copy_including_deps /$LMK/extra
 copy_including_deps /$LMK/modules.*
 
 
