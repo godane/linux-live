@@ -25,6 +25,10 @@ header "Live Kit init <http://www.linux-live.org/>"
 
 init_proc_sysfs
 
+echo "ramfs $MEMORY"
+mount -t ramfs ramfs $MEMORY
+
+
 # modprobe all devices excluding network drivers
 modprobe_everything -v /drivers/net/
 
@@ -113,6 +117,7 @@ if [ ! -z "$user" ]; then
 	fi
 fi
 debug_shell
+
 #timezone
 if [ ! -z "$timezone" ]; then
 	if [ -f $UNION/usr/share/zoneinfo/$timezone ]; then
