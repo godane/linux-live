@@ -405,7 +405,11 @@ fs_options()
       echo -n "-t $1 "
    fi
 
-   echo -n "-o rw"
+   if [ ! -z "$rolive" ]; then
+      echo -n "-o ro"
+   else
+      echo -n "-o rw"
+   fi
 
    if [ "$1" = "vfat" ]; then
       echo ",check=s,shortname=mixed,iocharset=utf8"
