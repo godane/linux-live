@@ -25,9 +25,6 @@ header "Live Kit init <http://www.linux-live.org/>"
 
 init_proc_sysfs
 
-echo "ramfs $MEMORY"
-mount -t ramfs ramfs $MEMORY
-
 
 # modprobe all devices excluding network drivers
 modprobe_everything -v /drivers/net/
