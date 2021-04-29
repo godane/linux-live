@@ -146,6 +146,12 @@ cp ../livekitlib $INITRAMFS/lib/
 cp ../config $INITRAMFS/lib/
 
 cd $INITRAMFS
+if [ "$(find lib/modules -type f -name "*.xz")" != "" ]; then
+	find lib/modules -type f -name "*.xz" -exec xz -d '{}' \;
+	for i in $(ls $LMK/modules.*); do
+		sed -i 's|.ko.xz|.ko|g' $i
+	done
+fi
 find . -print | cpio -o -H newc 2>/dev/null | xz -f --extreme --check=crc32 >$INITRAMFS.img
 echo $INITRAMFS.img
 
