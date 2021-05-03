@@ -124,7 +124,7 @@ fi
 debug_shell
 
 #copy the password files to $DATA/rootcopy if $home is used
-if [ ! -z "$home" ]; then
+if [ ! -z "$home" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
 		[ -d $DATA/rootcopy/etc ] || mkdir -p $DATA/rootcopy/etc
 		if [ -f $CHANGES/.rootfs/etc/$file ]; then
@@ -143,7 +143,9 @@ if [ ! -z "$timezone" ]; then
 fi
 debug_shell
 # rootcopy
-copy_rootcopy_content "$DATA" "$UNION"
+if [ -z "$norootcopy" ]; then
+	copy_rootcopy_content "$DATA" "$UNION"
+fi
 debug_shell
 # create fstab
 fstab_create "$UNION" "$DATAMNT"
