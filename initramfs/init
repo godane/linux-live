@@ -77,6 +77,14 @@ echo "ff02::2 ipt-allrouters" >> ${UNION}/etc/hosts
 echo "127.0.0.1 ${hostname}.example.net ${hostname}" >> ${UNION}/etc/hosts
 fi
 
+#mount bind a $DATAMNT/home folder to make it easier to update
+if [ ! -z "$home" ]; then
+	[ -d $DATAMNT/home ] || mkdir -p $DATAMNT/home
+	if [ -d $DATAMNT/home ]; then
+		mount -o bind $DATAMNT/home $UNION/home
+	fi
+fi
+
 #setup user and password
 if [ ! -z "$user" ]; then
 	if [ ! -d $UNION/home/$user ]; then
@@ -114,6 +122,17 @@ if [ ! -z "$user" ]; then
 	fi
 fi
 debug_shell
+
+#copy the password files to $DATA/rootcopy if $home is used
+if [ ! -z "$home" ]; then
+	for file in group gshadow passwd shadow subgid subuid; do
+		[ -d $DATA/rootcopy/etc ] || mkdir -p $DATA/rootcopy/etc
+		if [ -f $CHANGES/.rootfs/etc/$file ]; then
+			echo "$CHANGES/.rootfs/etc/$file"
+			cp -a $CHANGES/.rootfs/etc/$file $DATA/rootcopy/etc/$file
+		fi
+	done
+fi
 
 #timezone
 if [ ! -z "$timezone" ]; then
