@@ -118,7 +118,7 @@ create_bundle()
 {
    debug_log "create_module" "$*"
    rm -f "$2" # overwrite, never append to existing file
-   mksquashfs "$1" "$2" -comp xz -b 512K $3 $4 $5 $6 $7 $8 $9>/dev/null
+   mksquashfs "$1" "$2" -comp xz -b 1024K -always-use-fragments $3 $4 $5 $6 $7 $8 $9>/dev/null
 }
 
 
@@ -140,68 +140,6 @@ transfer_initramfs()
    fi
 }
 
-# Get / generate lowerdirs argument for 'mount -t overlayfs'
-# $1: Bundle mountpoint directory "/memory/bundles"
-# $2: Bundle extension
-#
-get_lowerdirs()
-{
-    local BUND_DIRS BUND_EXT BUND MNT_OPT
-    BUND_DIRS="$1"
-    BUND_EXT="$2"
-    MNT_OPT=""
-
-    find "$BUND_DIRS" -maxdepth 1 -type d -name "*.${BUND_EXT}" | sort | {
-        while read -r BUND; do
-            MNT_OPT="${BUND}:${MNT_OPT}"
-        done
-        MNT_OPT="${MNT_OPT%?}"
-        echo "$MNT_OPT"
-    }
-}
-
-# Check for POSIX compatiblity
-# WILL replace the built-in check inside persistent_changes()
-# $1: Directory to test
-#
-# Return codes:
-# 0 - Success
-# 1 - General error
-# 2 - Inaccessable
-#
-posix_chk() {
-    local CWD F1 F2 TARGET
-
-    TARGET="$(realpath "$1")"
-    CWD="$(pwd)"
-    F1="${TARGET}/.file1"
-    F2="${TARGET}/.file2"
-
-    # Check if read-only or inaccessable
-    touch "$F1" 2>/dev/null && [ -e "$F1" ]
-
-    if [ $? -ne 0 ]; then
-        cd "$CWD"
-        return 2
-    fi
-
-    # Start the cruel proccess.
-    # FAT32 hates, and really hates linking files!
-    chmod +x "$F1" 2>/dev/null && [ -x "$F1" ] && \
-    chmod -x "$F1" 2>/dev/null && [ ! -x "$F1" ] && \
-    ln -s "$F1" "$F2" 2>/dev/null && [ -e "$F2" ] && \
-    rm -f "$F1" "$F2" 2>/dev/null
-
-    if [ $? -ne 0 ]; then
-        cd "$CWD"
-        rm "$F1"
-        return 1
-    else
-        rm "$F1" "$F2"
-        cd "$CWD"
-        return 0
-    fi
-}
 
 # mount virtual filesystems like proc etc
 #
@@ -228,7 +166,7 @@ modprobe_everything()
    echo_green_star >&2
    echo "Probing for hardware" >&2
 
-   find /lib/modules/ | sort | fgrep .ko | egrep $1 $2 | sed -r "s:^.*/|[.]ko\$::g" | xargs -n 1 modprobe 2>/dev/null
+   find /lib/modules/ | fgrep .ko | egrep $1 $2 | sed -r "s:^.*/|[.]ko\$::g" | xargs -n 1 modprobe 2>/dev/null
    refresh_devs
 }
 
@@ -273,50 +211,50 @@ init_zram()
 }
 
 
-# load the AUFS kernel module if needed
+aufs_is_supported()
+{
+   cat /proc/filesystems | grep aufs
+}
+
+
+# load the AUFS kernel driver. If not found,
+# load overlayfs instead.
 #
 init_aufs()
 {
    debug_log "init_aufs" "$*"
-   # TODO maybe check here if aufs support is working at all
-   # and produce useful error message if user has no aufs
    modprobe aufs 2>/dev/null
+   if ! aufs_is_supported >/dev/null; then
+      modprobe overlay 2>/dev/null
+   fi
    refresh_devs
 }
 
-# Load OverlayFS kernel module
-#
-modprobe_overlay()
-{
-    debug_log "modprobe_overlay" "$*"
 
-    # Prepare for error messages
-    echo >>/var/log/livedbg
-
-    modprobe overlay 2>>/var/log/livedbg
-
-    # If overlay module failed to load, stop init
-    if [ $? -ne 0 ]; then
-        fatal "Failed to load OverlayFS module!"
-    fi
-
-    # finally, refresh all devices
-    refresh_devs
-}
-
-# Setup empty union
+# Setup empty aufs union, or create overlayfs union
 # $1 = changes directory (ramfs or persistent changes)
 # $2 = union directory where to mount the union
+# $3 = bundles directory
 #
 init_union()
 {
    debug_log "init_union" "$*"
-
-   echo_green_star
-   echo "Setting up union using AUFS"
    mkdir -p "$1"
    mkdir -p "$2"
-   mount -t aufs -o xino="/.xino",trunc_xino,br="$1" aufs "$2"
+
+   if aufs_is_supported >/dev/null; then
+      echo_green_star
+      echo "Setting up empty union using aufs"
+      mount -t aufs -o xino="/.xino",trunc_xino,br="$1" aufs "$2"
+   else
+      echo_green_star
+      echo "Setting up union using overlayfs"
+      mkdir -p "$1/.rootfs"
+      mkdir -p "$1/.work"
+      mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 
+      -maxdepth 1 | sortmod | tac | tr '\n' ':' | sed -r 
+      's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+   fi
 }
 
 
@@ -405,11 +343,7 @@ fs_options()
       echo -n "-t $1 "
    fi
 
-   if [ ! -z "$rolive" ]; then
-      echo -n "-o ro"
-   else
-      echo -n "-o rw"
-   fi
+   echo -n "-o rw"
 
    if [ "$1" = "vfat" ]; then
       echo ",check=s,shortname=mixed,iocharset=utf8"
@@ -563,7 +497,7 @@ download_data_pxe()
 
       init_network_ip
 
-      echo "* Downloading PXE file list"
+      echo "* Downloading PXE file list" >&2
 
       PROTOCOL=http
       wget -q -O "$1/PXEFILELIST" "http://$SERVER:$PORT/PXEFILELIST?$(uname -r):$(uname -m)"
@@ -573,11 +507,11 @@ download_data_pxe()
          echo PXEFILELIST | tftp_mget "$SERVER" "$1"
       fi
 
-      echo "* Downloading files from the list"
+      echo "* Downloading files from the list" >&2
 
       if [ "$PROTOCOL" = "http" ]; then
          cat "$1/PXEFILELIST" | while read FILE; do
-            wget -O "$1/$LIVEKITNAME/$FILE" "http://$SERVER:$PORT/$FILE"
+            wget -O "$1/$LIVEKITNAME/$(basename $FILE)" "http://$SERVER:$PORT/$FILE"
          done
       else
          JOBS=3
@@ -688,6 +622,7 @@ check_data_found()
    fi
 }
 
+
 # Activate persistent changes
 # $1 = data directory
 # $2 = target changes directory
@@ -696,9 +631,11 @@ persistent_changes()
 {
    debug_log "persistent_changes" "$*"
 
-   local CHANGES
+   local CHANGES T1 T2 EXISTS
 
    CHANGES="$1/$(basename "$2")"
+   T1="$CHANGES/.empty"
+   T2="$T1"2
 
    # Setup the directory anyway, it will be used in all cases
    mkdir -p "$2"
@@ -708,37 +645,45 @@ persistent_changes()
       return
    fi
 
+   # check if changes directory exists and is writable
+   touch "$T1" 2>/dev/null && rm -f "$T1" 2>/dev/null
+
+   # if not, simply return back
+   if [ $? -ne 0 ]; then
+      echo "* Persistent changes not writable or not used"
+      return
+   fi
+
    echo_green_star
-   echo "* Testing persistent changes for POSIX compatibility..." >&2
+   echo "Testing persistent changes for posix compatibility"
+   touch "$T1" && ln -sf "$T1" "$T2" 2>/dev/null && \
+   chmod +x "$T1" 2>/dev/null && test -x "$T1" && \
+   chmod -x "$T1" 2>/dev/null && test ! -x "$T1" && \
+   rm "$T1" "$T2" 2>/dev/null
 
-   posix_chk "$CHANGES"
+   if [ $? -eq 0 ]; then
+      echo "* Activating native persistent changes"
+      mount --bind "$CHANGES" "$2"
+      return
+   fi
 
-   case $? in
-       0)
-           echo_green_star
-           echo "* Activating native persistent changes..." >&2
-           mount --bind "$CHANGES" "$2"
-           ;;
+   if [ -e "$CHANGES/changes.dat" ]; then
+      echo "* Restoring persistent changes"
+      EXISTS="true"
+   else
+      echo "* Creating new persistent changes"
+      EXISTS=""
+   fi
 
-       1)
-           echo "* File system is not POSIX-compatible!" >&2
-           echo_green_star
-           echo "* Activating dynamic persistent changes..." >&2
+   @mount.dynfilefs "$CHANGES/changes.dat" 4000 "$2"
+   if [ ! "$EXISTS" ]; then
+      mke2fs -F "$2/loop.fs" >/dev/null 2>&1
+   fi
+   mount -o loop,sync "$2/loop.fs" "$2"
 
-           mount.dynfilefs "$CHANGES/changes.dat" 4000 "$2"
-           if [ "$(device_bestfs "$2/loop.fs" | tr -d " ")" = "-t" ]; then
-               mke2fs -F "$2/loop.fs" >/dev/null
-           fi
-           mount -o loop,sync "$2/loop.fs" "$2"
-           rmdir "$2/lost+found" 2>/dev/null
-           ;;
-
-       2)
-           echo "* Persistent changes read-only or not used." >&2
-           return
-           ;;
-   esac
-
+   # if test failed at any point, we may have temp files left behind
+   rm "$T1" "$T2" 2>/dev/null
+   rmdir "$2/lost+found" 2>/dev/null
 }
 
 
@@ -824,94 +769,38 @@ sortmod()
    cat - | sed -r "s,(.*/(.*)),\\2:\\1," | sort -n | cut -d : -f 2-
 }
 
-# Mount squashfs filesystem bundles
-# and add them to union
-# NEW: Prepare Overlay file system
-# $1 = directory where to search for bundles
-# $2 = directory where to mount bundles
-# $3 = directory where the changes is
-# $4 = directory where union is supposed to be
-#
-prepare_overlay()
-{
-    debug_log "prepare_overlay" "$*"
-
-    local BUN ALL_BUNDS LOWERDIR CHANGEDIR UPPERDIR WORKDIR
-
-	echo_green_star
-    echo "Preparing OverlayFS union..." >&2
-
-    echo >>/var/log/livedbg
-
-    # Just tell me why! Why be compact?!?
-    ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | \
-    sortmod | filter_load) | grep '[.]'"$BEXT"'$' |\
-    filter_noload | \
-    while read -r BUNDLE; do
-        BUN="$(basename "$BUNDLE")"
-        echo "Mounting $BUN to /memory/bundles..." >&2
-        mkdir -p "$2/$BUN"
-
-        # It now depends on your kernel!
-        mount -o loop -t squashfs "$1/$BUNDLE" "$2/$BUN"
-    done
-
-    # Time to mount overlayfs union
-    ALL_BUNDS="$(get_lowerdirs "$2" "$BEXT")"
-    LOWERDIR="/memory/lowerdir"
-    CHANGEDIR="$3"
-    UPPERDIR="${CHANGEDIR}/.rootfs"
-    WORKDIR="${CHANGEDIR}/.work"
-
-    # Make the both the upperdir and workdir ('cuz it's non-existant, yet...)
-    mkdir "$UPPERDIR" >/dev/null 2>&1
-    mkdir "$WORKDIR" >/dev/null 2>&1
-
-    # Make the union directory (this might actually be an alarming bug)
-    mkdir "$4" >/dev/null 2>&1
-
-    # Separate commands (to avoid `sh' errors)
-    # Join all modules together into the 'lowerdir' of main overlay
-    mkdir "$LOWERDIR" >/dev/null 2>&1
-    mount -t overlay -o lowerdir="$ALL_BUNDS" overlay "$LOWERDIR" \
-        >>/var/log/livedbg 2>&1
-
-    if [ $? -ne 0 ]; then
-        fatal "Failed to mount lower directory of main OverlayFS union!"
-    fi
-
-    # Join 'lowerdir' with the save directory (upperdir,workdir)
-    mount -t overlay -o lowerdir="$LOWERDIR",upperdir="$UPPERDIR",workdir="$WORKDIR" \
-    overlay "$4" >>/var/log/livedbg 2>&1
-
-    # Check if we got any errors...
-    if [ $? -ne 0 ]; then
-        fatal "Failed to mount main OverlayFS union!"
-    fi
-
-}
 
 # Mount squashfs filesystem bundles
-# and add them to union
 # $1 = directory where to search for bundles
 # $2 = directory where to mount bundles
-# $3 = directory where union is mounted
-#
-union_append_bundles()
+mount_bundles()
 {
-   debug_log "union_append_bundles" "$*"
-
-   local BUN
-
    echo_green_star
-   echo "Adding bundles to union"
+   echo "Mounting bundles"
    ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$BEXT'$' | filter_noload | while read BUNDLE; do
       echo "* $BUNDLE"
       BUN="$(basename "$BUNDLE")"
       mkdir -p "$2/$BUN"
       mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
-      mount -o remount,add:1:"$2/$BUN" aufs "$3"
    done
+}
+
+
+# Add mounted bundles to aufs union
+# $1 = directory where bundles are mounted
+# $2 = directory where union is mounted
+#
+union_append_bundles()
+{
+   debug_log "union_append_bundles" "$*"
+
+   if aufs_is_supported >/dev/null; then
+      echo_green_star
+      echo "Adding bundles to union"
+      find "$1" -mindepth 1 -maxdepth 1 | sortmod | while read BUNDLE; do
+         mount -o remount,add:1:"$BUNDLE" aufs "$2"
+      done
+   fi
 }
 
 
@@ -945,7 +834,7 @@ fstab_create()
       LABEL="$(basename $DEVICE)"
       OPTS="defaults,noatime,nofail,x-systemd.device-timeout=10"
 
-      if [ "$FS" != "swap" -a "$FS" != "squashfs" -a "$DEVICE" != "$BOOTDEVICE" ]; then
+      if [ "$FS" != "" -a "$FS" != "swap" -a "$FS" != "squashfs" -a "$DEVICE" != "$BOOTDEVICE" ]; then
          mkdir -p "$1/media/$LABEL"
          echo "$DEVICE" "/media/$LABEL" $FS $OPTS 0 0 >> $FSTAB
       fi
@@ -998,7 +887,7 @@ change_root()
    mkdir -p run
    mount -t tmpfs tmpfs run
    mkdir -p run/initramfs
-   #mount -n -o remount,ro aufs .
+   mount -n -o remount,ro aufs .
    pivot_root . run/initramfs
    exec $CHROOT . $INIT < dev/console > dev/console 2>&1
 }
