@@ -251,9 +251,7 @@ init_union()
       echo "Setting up union using overlayfs"
       mkdir -p "$1/.rootfs"
       mkdir -p "$1/.work"
-      mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 
-      -maxdepth 1 | sortmod | tac | tr '\n' ':' | sed -r 
-      's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+      mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | sortmod | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
    fi
 }
 
