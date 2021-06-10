@@ -48,6 +48,7 @@ init_union "$CHANGES" "$UNION" "$BUNDLES"
 
 # add data to aufs union
 union_append_bundles "$BUNDLES" "$UNION"
+
 debug_shell
 if [ ! -z "$hostname" ]; then
 # Configure hostname and network:
@@ -117,9 +118,9 @@ if [ ! -z "$home" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 		elif [ -f "$CHANGES/etc/$file" ]; then
 				file1="$CHANGES/etc/$file"
 		fi
-		if [ -f $file1 ]; then
-			echo "$file1"
-			cp -a $file1 $DATA/rootcopy/etc/$file
+		if [ -f "${file1}" ]; then
+			echo "${file1}"
+			cp -a "${file1}" $DATA/rootcopy/etc/$file
 		fi
 	done
 fi
