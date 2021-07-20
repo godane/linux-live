@@ -110,9 +110,9 @@ fi
 debug_shell
 
 #copy the password files to $DATA/rootcopy if $home is used
-if [ ! -z "$home" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
+if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
-		[ -d $DATA/rootcopy/etc ] || mkdir -p $DATA/rootcopy/etc
+		[ -d /tmp1/etc ] || mkdir -p /tmp1/etc
 		if [ -f "$CHANGES/.rootfs/etc/$file" ]; then
 				file1="$CHANGES/.rootfs/etc/$file"
 		elif [ -f "$CHANGES/etc/$file" ]; then
@@ -120,9 +120,10 @@ if [ ! -z "$home" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 		fi
 		if [ -f "${file1}" ]; then
 			echo "${file1}"
-			cp -a "${file1}" $DATA/rootcopy/etc/$file
+			cp -a "${file1}" /tmp1/etc/$file
 		fi
 	done
+	[ -f $DATA/modules/100-${user}-password.sb ] || mksquashfs /tmp1 $DATA/modules/100-${user}-password.sb
 fi
 
 #timezone
