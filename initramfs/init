@@ -124,10 +124,15 @@ if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" 
 		fi
 	done
 	date="$(date +%Y%m%d-%H%M%S)"
-	module="$DATA/modules/${date}-100-${user}-password.sb"
-	if [ ! -f $module ]; then
-		echo "Making $module"
-		mksquashfs /tmp1 $module 2>/dev/null >>/var/log/livedbg
+	modulepsw="$DATA/modules/${date}-100-${user}-password.sb"
+	if [ ! -f $modulepsw ]; then
+		echo "Making $modulepsw"
+		mksquashfs /tmp1 $modulepsw 2>/dev/null >>/var/log/livedbg
+	fi
+	modulehome="$DATA/modules/${date}-100-${user}-home.sb"
+	if [ ! -f $modulehome ]; then
+		echo "Making $modulehome"
+		mksquashfs $UNION/home $modulehome -keep-as-directory  2>/dev/null >>/var/log/livedbg
 	fi
 fi
 
