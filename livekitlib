@@ -251,7 +251,7 @@ init_union()
       echo "Setting up union using overlayfs"
       mkdir -p "$1/.rootfs"
       mkdir -p "$1/.work"
-      mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | sortmod | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+      mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | cat | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
    fi
 }
 
@@ -783,6 +783,20 @@ mount_bundles()
    done
 }
 
+# Mount squashfs filesystem bundles
+# $1 = directory where to search for bundles
+# $2 = directory where to mount bundles
+mount_bundles_modpath()
+{
+   echo_green_star
+   echo "Mounting bundles modpath"
+   ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$BEXT'$' | filter_noload | while read BUNDLE; do
+      echo "* $BUNDLE"
+      BUN="$(basename "$BUNDLE")"
+      mkdir -p "$2/$BUN"
+      mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+   done
+}
 
 # Add mounted bundles to aufs union
 # $1 = directory where bundles are mounted

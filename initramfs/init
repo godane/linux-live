@@ -43,6 +43,14 @@ DATA="$(copy_to_ram "$DATA" "$CHANGES")"
 # mount bundles
 mount_bundles "$DATA" "$BUNDLES"
 debug_shell
+
+if [ ! -z "$modpath" ]; then
+	if [ -d "$DATAMNT"/"$modpath" ]; then
+		mount_bundles_modpath "$DATAMNT"/"$modpath" "$BUNDLES"
+	fi
+fi
+debug_shell
+
 # init aufs union, or setup overlayfs union
 init_union "$CHANGES" "$UNION" "$BUNDLES"
 
