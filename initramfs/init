@@ -152,6 +152,17 @@ if [ ! -z "$timezone" ]; then
 	fi
 fi
 debug_shell
+
+if [ ! -z "$locale" ]; then
+	echo "Locale ${locale}.UTF-8"
+	echo "LC_ALL=${locale}.UTF-8" | tee $UNION/etc/environment
+	echo "${locale}.UTF-8 UTF-8" | tee $UNION/etc/locale.gen
+	echo "LANG=${locale}.UTF-8" | tee $UNION/etc/locale.conf
+	echo "chroot $UNION"
+	chroot $UNION locale-gen ${locale}.UTF-8
+fi
+
+debug_shell
 # rootcopy
 if [ -z "$norootcopy" ]; then
 	copy_rootcopy_content "$DATA" "$UNION"
