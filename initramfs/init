@@ -74,9 +74,9 @@ fi
 
 #mount bind a $DATAMNT/home folder to make it easier to update
 if [ ! -z "$home" ]; then
-	[ -d $DATAMNT/home ] || mkdir -p $DATAMNT/home
-	if [ -d $DATAMNT/home ]; then
-		mount -o bind $DATAMNT/home $UNION/home
+	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
+	if [ -d $DATAMNT/$home ]; then
+		mount -o bind $DATAMNT/$home $UNION/home
 	fi
 fi
 
@@ -93,6 +93,8 @@ if [ ! -z "$user" ]; then
 		#if this is added with kali linux it would fail the all groups so best to do it by itself
 		chroot $UNION usermod -a -G scanner $user
 		debug_shell
+		echo "Setting up /home/$user folder"
+		chroot $UNION mkhomedir_helper $user
 		echo "Setting up $user password"
 		echo "$user:$user" > $UNION/tmp/chpasswd.tmp
 		#chroot $UNION /usr/sbin/chpasswd < $UNION/tmp/chpasswd.tmp
@@ -155,10 +157,11 @@ debug_shell
 
 if [ ! -z "$locale" ]; then
 	echo "Locale ${locale}.UTF-8"
-	echo "LC_ALL=${locale}.UTF-8" | tee $UNION/etc/environment
+	sed -i 's|^LC_ALL=.*||g' $UNION/etc/environment
+	echo "LC_ALL=${locale}.UTF-8" | tee -a $UNION/etc/environment
 	echo "${locale}.UTF-8 UTF-8" | tee $UNION/etc/locale.gen
 	echo "LANG=${locale}.UTF-8" | tee $UNION/etc/locale.conf
-	echo "chroot $UNION"
+	echo "chroot $UNION locale-gen ${locale}.UTF-8"
 	chroot $UNION locale-gen ${locale}.UTF-8
 fi
 
