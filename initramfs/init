@@ -72,7 +72,8 @@ echo "ff02::2 ipt-allrouters" >> ${UNION}/etc/hosts
 echo "127.0.0.1 ${hostname}.example.net ${hostname}" >> ${UNION}/etc/hosts
 fi
 
-#mount bind a $DATAMNT/home folder to make it easier to update
+#mount bind a $DATAMNT/$home folder to make it easier to update
+#ex home=folder then the folder mount bind $DATAMNT/folder
 if [ ! -z "$home" ]; then
 	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	if [ -d $DATAMNT/$home ]; then
@@ -145,7 +146,17 @@ if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" 
 		mksquashfs $UNION/home $modulehome -keep-as-directory  2>/dev/null >>/var/log/livedbg
 	fi
 fi
+debug_shell
 
+if [ ! -z "$autologin" ]; then
+	echo "setting up lightdm autologin of user $user"
+	if [ -d $UNION/etc/lightdm/lightdm.conf.d ]; then
+		echo "[Seat:*]" > $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
+		echo "autologin-user=$user" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
+		echo "autologin-user-timeout=0" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
+	fi
+fi
+debug_shell
 #timezone
 if [ ! -z "$timezone" ]; then
 	if [ -f $UNION/usr/share/zoneinfo/$timezone ]; then
