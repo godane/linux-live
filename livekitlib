@@ -571,6 +571,12 @@ find_data_try()
          return
       fi
 
+      # search for bundles in the mounted directory
+      if [ "$(find "$1/$FROM" -maxdepth 1 -name "*.$DFBEXT" 2>/dev/null)" != "" ]; then
+         # we found at least one bundle/module here
+         echo "$1/$FROM" | tr -s "/" | sed -r "s:/[^/]+/[.][.]/:/:g"
+         return
+      fi
       # unmount twice, since there could be mounted ISO as loop too. If not, it doesn't hurt
       umount "$1" 2>/dev/null
       umount "$1" 2>/dev/null
@@ -796,6 +802,21 @@ mount_bundles()
    done
 }
 
+# Mount dwarfs filesystem bundles
+# $1 = directory where to search for bundles
+# $2 = directory where to mount bundles
+mount_df_bundles()
+{
+   echo_green_star
+   echo "Mounting df bundles"
+   ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$DFBEXT'$' | filter_noload | while read BUNDLE; do
+      echo "* $BUNDLE"
+      BUN="$(basename "$BUNDLE")"
+      mkdir -p "$2/$BUN"
+      dwarfs "$1/$BUNDLE" "$2/$BUN"
+   done
+}
+
 # Mount squashfs filesystem bundles
 # $1 = directory where to search for bundles
 # $2 = directory where to mount bundles
@@ -808,6 +829,21 @@ mount_bundles_modpath()
       BUN="$(basename "$BUNDLE")"
       mkdir -p "$2/$BUN"
       mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+   done
+}
+
+# Mount dwarfs filesystem bundles
+# $1 = directory where to search for bundles
+# $2 = directory where to mount bundles
+mount_df_bundles_modpath()
+{
+   echo_green_star
+   echo "Mounting bundles modpath"
+   ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$DFBEXT'$' | filter_noload | while read BUNDLE; do
+      echo "* $BUNDLE"
+      BUN="$(basename "$BUNDLE")"
+      mkdir -p "$2/$BUN"
+      dwarfs "$1/$BUNDLE" "$2/$BUN"
    done
 }
 
