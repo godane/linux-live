@@ -188,6 +188,7 @@ init_devs()
    modprobe zram 2>/dev/null
    modprobe loop 2>/dev/null
    modprobe squashfs 2>/dev/null
+   modprobe erofs 2>/dev/null
    modprobe fuse 2>/dev/null
    refresh_devs
 }
@@ -787,63 +788,49 @@ sortmod()
 }
 
 
-# Mount squashfs filesystem bundles
+# Mount squashfs/dwarfs/erofs filesystem bundles
 # $1 = directory where to search for bundles
 # $2 = directory where to mount bundles
 mount_bundles()
 {
    echo_green_star
    echo "Mounting bundles"
-   ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$BEXT'$' | filter_noload | while read BUNDLE; do
-      echo "* $BUNDLE"
-      BUN="$(basename "$BUNDLE")"
-      mkdir -p "$2/$BUN"
-      mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+   for EXT in $BEXT $DFBEXT $EFBEXT; do
+      ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
+         echo "* $BUNDLE"
+         BUN="$(basename "$BUNDLE")"
+         mkdir -p "$2/$BUN"
+         if [ "$EXT" == "$BEXT" ]; then
+            mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+         elif [ "$EXT" == "$DFBEXT" ]; then
+            dwarfs "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=32M
+         elif [ "$EXT" == "$EFBEXT" ]; then
+            mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
+         fi
+      done
    done
 }
 
-# Mount dwarfs filesystem bundles
-# $1 = directory where to search for bundles
-# $2 = directory where to mount bundles
-mount_df_bundles()
-{
-   echo_green_star
-   echo "Mounting df bundles"
-   ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$DFBEXT'$' | filter_noload | while read BUNDLE; do
-      echo "* $BUNDLE"
-      BUN="$(basename "$BUNDLE")"
-      mkdir -p "$2/$BUN"
-      dwarfs "$1/$BUNDLE" "$2/$BUN"
-   done
-}
-
-# Mount squashfs filesystem bundles
+# Mount squashfs/dwarfs/erofs filesystem bundles
 # $1 = directory where to search for bundles
 # $2 = directory where to mount bundles
 mount_bundles_modpath()
 {
    echo_green_star
    echo "Mounting bundles modpath"
-   ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$BEXT'$' | filter_noload | while read BUNDLE; do
-      echo "* $BUNDLE"
-      BUN="$(basename "$BUNDLE")"
-      mkdir -p "$2/$BUN"
-      mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
-   done
-}
-
-# Mount dwarfs filesystem bundles
-# $1 = directory where to search for bundles
-# $2 = directory where to mount bundles
-mount_df_bundles_modpath()
-{
-   echo_green_star
-   echo "Mounting bundles modpath"
-   ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$DFBEXT'$' | filter_noload | while read BUNDLE; do
-      echo "* $BUNDLE"
-      BUN="$(basename "$BUNDLE")"
-      mkdir -p "$2/$BUN"
-      dwarfs "$1/$BUNDLE" "$2/$BUN"
+   for EXT in $BEXT $DFBEXT $EFBEXT; do
+      ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
+         echo "* $BUNDLE"
+         BUN="$(basename "$BUNDLE")"
+         mkdir -p "$2/$BUN"
+         if [ "$EXT" == "$BEXT" ]; then
+            mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+         elif [ "$EXT" == "$DFBEXT" ]; then
+            dwarfs "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=32M
+         elif [ "$EXT" == "$EFBEXT" ]; then
+            mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
+         fi
+       done
    done
 }
 

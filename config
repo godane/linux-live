@@ -46,5 +46,8 @@ BEXT=sb
 # Bundle extension dwarfs, for example 'df' for .df extension
 DFBEXT=df
 
+# Bundle extension erofs, for example 'ef' for .ef extension
+EFBEXT=ef
+
 # Directory with kernel .ko modules, can be different in some distros
 LMK="lib/modules/$KERNEL"
