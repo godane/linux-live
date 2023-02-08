@@ -30,6 +30,8 @@ init_devs
 init_aufs
 init_zram
 
+# initialize blkid cache file
+init_blkid_cache
 
 # find data dir with filesystem bundles
 DATA="$(find_data 45 "$DATAMNT")"
@@ -75,11 +77,32 @@ fi
 
 #mount bind a $DATAMNT/$home folder to make it easier to update
 #ex home=folder then the folder mount bind $DATAMNT/folder
-if [ ! -z "$home" ]; then
+#only mount 
+if [ ! -z "$home" -a -z "$homedat"]; then
 	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	if [ -d $DATAMNT/$home ]; then
 		mount -o bind $DATAMNT/$home $UNION/home
 	fi
+fi
+
+if [ ! -z "$home" -a ! -z "$homedat" ]; then
+	if [ -z "$homedatsize" ]; then
+		homedatsize="16000"
+	fi
+
+	if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
+		echo "* Restoring persistent changes"
+		EXISTS="true"
+	else
+		echo "* Creating new persistent changes"
+		EXISTS=""
+    fi
+    [ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
+	@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$homedatsize" -m "$UNION/home" -p 4000
+	if [ ! "$EXISTS" ]; then
+		mke2fs -F "$UNION/home/virtual.dat" >/dev/null 2>&1
+	fi
+	mount -o loop,sync "$UNION/home/virtual.dat" "$UNION/home"
 fi
 
 debug_shell
@@ -124,7 +147,7 @@ fi
 debug_shell
 
 #copy the password files to $DATA/rootcopy if $home is used
-if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
+if [ ! -z "$home" -a  ! -z "$user" ! -z "$homedat" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
 		[ -d /tmp1/etc ] || mkdir -p /tmp1/etc
 		if [ -f "$CHANGES/.rootfs/etc/$file" ]; then

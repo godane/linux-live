@@ -309,6 +309,15 @@ mounted_dir()
    done
 }
 
+# Initialize blkid cache by manually probing all devices
+#
+init_blkid_cache()
+{
+   local DEV
+   cat /proc/partitions | tr -s " " |  cut -d " " -f 5 | while read DEV; do
+      blkid /dev/$DEV >/dev/null 2>/dev/null
+   done
+}
 
 # Get device tag.
 # $1 = device
@@ -333,6 +342,8 @@ device_bestfs()
    FS="$(device_tag "$1" TYPE | tr [A-Z] [a-z])"
    if [ "$FS" = "msdos" -o "$FS" = "fat" -o "$FS" = "vfat" ]; then
       FS="vfat"
+   elif [ "$FS" = "udf" ]; then
+      FS="iso9660"
    elif [ "$FS" = "ntfs" ]; then
       FS="ntfs-3g"
    fi
@@ -685,7 +696,7 @@ persistent_changes()
       return
    fi
 
-   if [ -e "$CHANGES/changes.dat" ]; then
+   if [ -e "$CHANGES/changes.dat.0" ]; then
       echo "* Restoring persistent changes"
       EXISTS="true"
    else
@@ -693,11 +704,11 @@ persistent_changes()
       EXISTS=""
    fi
 
-   @mount.dynfilefs "$CHANGES/changes.dat" 4000 "$2"
+   @mount.dynfilefs -f "$CHANGES/changes.dat" -s 16000 -m "$2" -p 4000
    if [ ! "$EXISTS" ]; then
-      mke2fs -F "$2/loop.fs" >/dev/null 2>&1
+      mke2fs -F "$2/virtual.dat" >/dev/null 2>&1
    fi
-   mount -o loop,sync "$2/loop.fs" "$2"
+   mount -o loop,sync "$2/virtual.dat" "$2"
 
    # if test failed at any point, we may have temp files left behind
    rm "$T1" "$T2" 2>/dev/null
