@@ -99,7 +99,7 @@ if [ ! -z "$home" -a ! -z "$homedat" ]; then
     fi
     [ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$homedatsize" -m "$UNION/home" -p 4000
-	if [ ! "$EXISTS" ]; then
+	if [ "$EXISTS" == "" ]; then
 		mke2fs -F "$UNION/home/virtual.dat" >/dev/null 2>&1
 	fi
 	mount -o loop,sync "$UNION/home/virtual.dat" "$UNION/home"
@@ -147,7 +147,7 @@ fi
 debug_shell
 
 #copy the password files to $DATA/rootcopy if $home is used
-if [ ! -z "$home" -a  ! -z "$user" ! -z "$homedat" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
+if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
 		[ -d /tmp1/etc ] || mkdir -p /tmp1/etc
 		if [ -f "$CHANGES/.rootfs/etc/$file" ]; then
