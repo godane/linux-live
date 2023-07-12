@@ -22,7 +22,7 @@ VMLINUZ=/vmlinuz
 # Kernel version. Change it to "3.2.28" for example, if you are building
 # Live Kit with a different kernel than the one you are actually running
 #KERNEL=5.8.0-34-generic
-KERNEL=5.15.0-45-generic
+KERNEL=6.2.0-24-generic
 
 # List of directories for root filesystem
 # No subdirectories are allowed, no slashes,
@@ -45,6 +45,9 @@ BEXT=sb
 
 # Bundle extension dwarfs, for example 'df' for .df extension
 DFBEXT=df
+DFOPTION="--tool=dwarfs"
+DFCMD="bazinga"
+
 
 # Bundle extension erofs, for example 'ef' for .ef extension
 EFBEXT=ef

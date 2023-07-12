@@ -806,6 +806,9 @@ mount_bundles()
 {
    echo_green_star
    echo "Mounting bundles"
+   if [ -z "$dfcachesize" ]; then
+      dfcachesize="32M"
+   fi
    for EXT in $BEXT $DFBEXT $EFBEXT; do
       ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
          echo "* $BUNDLE"
@@ -814,7 +817,7 @@ mount_bundles()
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            dwarfs "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=32M
+            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize
          elif [ "$EXT" == "$EFBEXT" ]; then
             mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
          fi
@@ -829,6 +832,9 @@ mount_bundles_modpath()
 {
    echo_green_star
    echo "Mounting bundles modpath"
+   if [ -z "$dfcachesize" ]; then
+      dfcachesize="32M"
+   fi
    for EXT in $BEXT $DFBEXT $EFBEXT; do
       ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
          echo "* $BUNDLE"
@@ -837,7 +843,7 @@ mount_bundles_modpath()
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            dwarfs "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=32M
+            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize
          elif [ "$EXT" == "$EFBEXT" ]; then
             mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
          fi
