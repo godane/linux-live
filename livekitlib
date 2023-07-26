@@ -809,15 +809,23 @@ mount_bundles()
    if [ -z "$dfcachesize" ]; then
       dfcachesize="32M"
    fi
-   for EXT in $BEXT $DFBEXT $EFBEXT; do
-      ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
+   for EXT in $BEXT $BOEXT $DFBEXT $EFBEXT; do
+      ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+         elif [ "$EXT" == "$BOEXT" ]; then
+			LOOPD="$(losetup -f)"
+			LOOPN="$(echo "$LOOPD" | sed 's|/dev/loop||g')"
+			if [ ! -e $LOOPD ]; then
+				mknod $LOOPD b 7 $LOOPN
+			fi
+			losetup "$LOOPD" "$1/$BUNDLE" -o $OFFSET
+			mount "$LOOPD" "$2/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize
+            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
             mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
          fi
@@ -835,15 +843,23 @@ mount_bundles_modpath()
    if [ -z "$dfcachesize" ]; then
       dfcachesize="32M"
    fi
-   for EXT in $BEXT $DFBEXT $EFBEXT; do
-      ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | while read BUNDLE; do
+   for EXT in $BEXT $BOEXT $DFBEXT $EFBEXT; do
+      ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+         elif [ "$EXT" == "$BOEXT" ]; then
+			LOOPD="$(losetup -f)"
+			LOOPN="$(echo "$LOOPD" | sed 's|/dev/loop||g')"
+			if [ ! -e $LOOPD ]; then
+				mknod $LOOPD b 7 $LOOPN
+			fi
+			losetup "$LOOPD" "$1/$BUNDLE" -o $OFFSET
+			mount "$LOOPD" "$2/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize
+            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
             mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
          fi

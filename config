@@ -43,9 +43,13 @@ LIVEKITDATA=/tmp/$LIVEKITNAME-data-$$
 # Bundle extension, for example 'sb' for .sb extension
 BEXT=sb
 
-# Bundle extension dwarfs, for example 'df' for .df extension
+BOEXT=sbo
+OFFSET="$((1024 * 1024))"
+
+# Bundle extension, for example 'df' for .df extension
 DFBEXT=df
 DFOPTION="--tool=dwarfs"
+DFMOUNTOPT="-o no_cache_files -o tidy_strategy=time -o tidy_interval=30 -o tidy_max_age=30"
 DFCMD="bazinga"
 
 
