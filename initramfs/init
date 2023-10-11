@@ -61,7 +61,10 @@ init_union "$CHANGES" "$UNION" "$BUNDLES"
 union_append_bundles "$BUNDLES" "$UNION"
 
 debug_shell
+hostname="$(cat /proc/cmdline | grep hostname= | sed 's|.*hostname=||g' | sed 's| .*||g')"
+
 if [ ! -z "$hostname" ]; then
+echo "* Change hostname to $hostname"
 # Configure hostname and network:
 #echo "${hostname}.example.net" > ${UNION}/etc/HOSTNAME
 echo "${hostname}" > ${UNION}/etc/hostname
@@ -75,10 +78,12 @@ echo "ff02::2 ipt-allrouters" >> ${UNION}/etc/hosts
 echo "127.0.0.1 ${hostname}.example.net ${hostname}" >> ${UNION}/etc/hosts
 fi
 
+debug_shell
+
 #mount bind a $DATAMNT/$home folder to make it easier to update
 #ex home=folder then the folder mount bind $DATAMNT/folder
 #only mount 
-if [ ! -z "$home" -a -z "$homedat"]; then
+if [ ! -z "$home" -a -z "$homedat" ]; then
 	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	if [ -d $DATAMNT/$home ]; then
 		mount -o bind $DATAMNT/$home $UNION/home
