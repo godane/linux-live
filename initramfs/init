@@ -32,9 +32,25 @@ init_zram
 
 # initialize blkid cache file
 init_blkid_cache
-
+debug_shell
+if [[ -d /ventoy ]]
+then
+    DEVICE="$(ventoy_drive_label_device)"
+fi
+debug_shell
 # find data dir with filesystem bundles
+if [ "$DEVICE" != "" ]; then
+    [ -d $DATAMNT ] || mkdir -p $DATAMNT
+    mount $DEVICE $DATAMNT
+    FROM="$(cmdline_value from)"
+    if [ "$FROM" != "" ]; then
+       DATA="$DATAMNT/$FROM"
+    else
+       DATA="$DATAMNT/$LIVEKITNAME"
+    fi
+else
 DATA="$(find_data 45 "$DATAMNT")"
+fi
 check_data_found "$DATA"
 debug_shell
 # setup persistent changes, if possible

@@ -325,6 +325,16 @@ init_blkid_cache()
    done
 }
 
+ventoy_drive_label_device()
+{
+   local DEV
+   cat /proc/partitions | tr -s " " |  cut -d " " -f 5 | grep ^[a-z] | while read DEV; do
+      if [ "$(device_tag /dev/$DEV LABEL | grep ^Ventoy)" != "" ]; then
+		echo "/dev/$DEV"
+	  fi
+   done
+}
+
 # Get device tag.
 # $1 = device
 # $2 = tag name, such as TYPE, LABEL, UUID, etc
