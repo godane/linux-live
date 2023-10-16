@@ -35,22 +35,22 @@ init_blkid_cache
 debug_shell
 if [[ -d /ventoy ]]
 then
-    DEVICE="$(ventoy_drive_label_device)"
-fi
-debug_shell
-# find data dir with filesystem bundles
-if [ "$DEVICE" != "" ]; then
-    [ -d $DATAMNT ] || mkdir -p $DATAMNT
-    mount $DEVICE $DATAMNT
-    FROM="$(cmdline_value from)"
-    if [ "$FROM" != "" ]; then
-       DATA="$DATAMNT/$FROM"
-    else
-       DATA="$DATAMNT/$LIVEKITNAME"
+    VENTOY_DEVICE="$(ventoy_drive_label_device)"
+    if [ "$VENTOY_DEVICE" != "" ]; then
+       [ -d $DATAMNT ] || mkdir -p $DATAMNT
+       mount $VENTOY_DEVICE $DATAMNT
+       FROM="$(cmdline_value from)"
+       if [ "$FROM" != "" ]; then
+          DATA="$DATAMNT/$FROM"
+       else
+          DATA="$DATAMNT/$LIVEKITNAME"
+       fi
     fi
 else
-DATA="$(find_data 45 "$DATAMNT")"
+    # find data dir with filesystem bundles
+    DATA="$(find_data 45 "$DATAMNT")"
 fi
+
 check_data_found "$DATA"
 debug_shell
 # setup persistent changes, if possible
