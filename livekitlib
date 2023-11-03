@@ -917,19 +917,14 @@ persistent_changes()
    # mount it, splitsize of 4000MB is hardcoded, it must be the same all the time anyway
    echo "- mounting dynamically enlarged storage"
    @mount.dynfilefs -f "$CHANGES/$PERCHFILE" -s $PERCHSIZE -m "$2" -p 4000
-   if [ ! "$EXISTS" ]; then
-      echo "- creating filesystem"
-      mkfs.xfs.custom "$2/virtual.dat"
-   fi
-
-   if [ "$PERCHSIZE" -gt 16000 ]; then
-      GROWDIR=/tmp/changes.grow
-      echo "- grow if needed"
-      mkdir -p "$GROWDIR"
-      mount -o loop "$2/virtual.dat" "$GROWDIR"
-      xfs_growfs "$GROWDIR" >/dev/null
-      umount "$GROWDIR"
-      rmdir "$GROWDIR"
+   if [ "$EXISTS" ]; then
+      echo "- filesystem check"
+      e2fsck -y "$2/virtual.dat" >>/var/log/perch.fsck.log 2>&1
+      echo "- filesystem grow if needed"
+      resize2fs -f "$2/virtual.dat" >>/var/log/perch.resize.log 2>&1
+   else
+      echo "- filesystem creation"
+      mke2fs -t ext4 -F "$2/virtual.dat" >/dev/null 2>&1
    fi
 
    echo "- mounting persistent changes"
