@@ -35,7 +35,8 @@ init_blkid_cache
 debug_shell
 if [[ -d /ventoy ]]
 then
-    VENTOY_DEVICE="$(ventoy_drive_label_device)"
+    VENTOY_DEVICE="$(blkid -s LABEL | grep 'LABEL="Ventoy"' | sed 's|:.*||g')"
+    echo "ventoy_device should be here : $VENTOY_DEVICE"
     if [ "$VENTOY_DEVICE" != "" ]; then
        [ -d $DATAMNT ] || mkdir -p $DATAMNT
        mount $VENTOY_DEVICE $DATAMNT
@@ -112,16 +113,22 @@ if [ ! -z "$home" -a ! -z "$homedat" ]; then
 	fi
 
 	if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
-		echo "* Restoring persistent changes"
+		echo "* Restoring home"
 		EXISTS="true"
 	else
-		echo "* Creating new persistent changes"
+		echo "* Creating new home"
 		EXISTS=""
     fi
     [ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$homedatsize" -m "$UNION/home" -p 4000
-	if [ "$EXISTS" == "" ]; then
-		mke2fs -F "$UNION/home/virtual.dat" >/dev/null 2>&1
+	if [ "$EXISTS" ]; then
+		echo "- home filesystem check"
+		e2fsck -y "$UNION/home/virtual.dat" >>/var/log/homedat.fsck.log 2>&1
+		echo "- home filesystem grow if needed"
+		resize2fs -f "$UNION/home/virtual.dat" >>/var/log/homedat.resize.log 2>&1
+	else
+		echo "- home filesystem creation"
+		mke2fs -t ext4 -F "$UNION/home/virtual.dat" >/dev/null 2>&1
 	fi
 	mount -o loop,sync "$UNION/home/virtual.dat" "$UNION/home"
 fi
@@ -186,11 +193,6 @@ if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" 
 	if [ "$(find $DATA/modules -name "*-100-${user}-password.sb" -type f)" == "" ]; then
 		echo "Making $modulepsw"
 		mksquashfs /tmp1 $modulepsw 2>/dev/null >>/var/log/livedbg
-	fi
-	modulehome="$DATA/modules/${date}-100-${user}-home.sb"
-	if [ "$(find $DATA/modules -name "*-100-${user}-home.sb" -type f)" == "" ]; then
-		echo "Making $modulehome"
-		mksquashfs $UNION/home $modulehome -keep-as-directory  2>/dev/null >>/var/log/livedbg
 	fi
 fi
 debug_shell
