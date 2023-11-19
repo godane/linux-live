@@ -35,6 +35,13 @@ init_blkid_cache
 debug_shell
 if [[ -d /ventoy ]]
 then
+    # init_devs must be executed again, otherwise disk devices are not available yet
+    # But these are required for the ventoy disk mount hook
+    . /ventoy/hook/ventoy-hook-lib.sh
+    while [[ $(get_ventoy_disk_name) == "unknown" ]]
+    do
+        init_devs
+    done
     VENTOY_DEVICE="$(blkid -s LABEL | grep 'LABEL="Ventoy"' | sed 's|:.*||g')"
     echo "ventoy_device should be here : $VENTOY_DEVICE"
     if [ "$VENTOY_DEVICE" != "" ]; then
