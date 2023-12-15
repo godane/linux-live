@@ -858,6 +858,7 @@ persistent_changes()
    if grep -vq perch /proc/cmdline; then
       return
    fi
+   [ -d "$CHANGES" ] || mkdir -p "$CHANGES"
 
    PERCHDIR=$(restore_perch_session "$CHANGES")
 

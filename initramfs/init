@@ -62,7 +62,7 @@ fi
 check_data_found "$DATA"
 debug_shell
 # setup persistent changes, if possible
-persistent_changes "$DATA" "$CHANGES"
+persistent_changes "$DATAMNT" "$CHANGES"
 debug_shell
 # copy to RAM if needed
 DATA="$(copy_to_ram "$DATA" "$CHANGES")"
