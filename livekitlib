@@ -116,11 +116,27 @@ allow_only_root()
 #
 create_bundle()
 {
-   debug_log "create_module" "$*"
+   debug_log "create_bundle" "$*"
    rm -f "$2" # overwrite, never append to existing file
    mksquashfs "$1" "$2" -comp xz -b 1024K -always-use-fragments $3 $4 $5 $6 $7 $8 $9>/dev/null
 }
 
+#check files
+#check files hash on boot if sha512sum
+# $1 = module thats being checked
+check_files()
+{
+   debug_log "check_files" "$*"
+   local CFILE
+   CFILE="$1"
+   if [ -f "$CFILE.$SUMHASH" ]; then
+      if [ "$(head -c $checknum $CFILE | $SUMHASH)" == "$(cat $CFILE.$SUMHASH)" ]; then
+          echolog "$CFILE OK"
+      else
+          echolog "$CFILE FAILED"
+      fi
+   fi
+}
 
 # Move entire initramfs tree to tmpfs mount.
 # It's a bit tricky but is necessray to enable pivot_root
@@ -1031,6 +1047,9 @@ mount_bundles()
       ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
+         if [ "$checkfiles" == "y" ]; then
+            check_files "$1/$BUNDLE"
+         fi
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
@@ -1065,6 +1084,9 @@ mount_bundles_modpath()
       ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
+         if [ "$modcheckfiles" == "y" ]; then
+            check_files "$1/$BUNDLE"
+         fi
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
             mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"

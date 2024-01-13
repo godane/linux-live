@@ -46,6 +46,9 @@ BEXT=sb
 BOEXT=sbo
 OFFSET="$((1024 * 1024))"
 
+checknum="$((4096 * 1024))"
+SUMHASH="sha512sum"
+
 # Bundle extension, for example 'df' for .df extension
 DFBEXT=df
 DFOPTION="--tool=dwarfs"
