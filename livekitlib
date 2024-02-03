@@ -121,19 +121,56 @@ create_bundle()
    mksquashfs "$1" "$2" -comp xz -b 1024K -always-use-fragments $3 $4 $5 $6 $7 $8 $9>/dev/null
 }
 
-#check files
-#check files hash on boot if sha512sum
-# $1 = module thats being checked
-check_files()
+create_bundle_sbo()
 {
-   debug_log "check_files" "$*"
+   debug_log "create_bundle_sbo" "$*"
+   rm -f "$2" # overwrite, never append to existing file
+   mksquashfs "$1" "$2" -comp lzo -b 128k -o $OFFSET $3 $4 $5 $6 $7 $8 $9>/dev/null
+}
+
+make_check_files()
+{
+	for i in head tail full; do
+	   find -type f | grep -v $SUMHASH | while read file; do
+           if [ "$i" == "full" ]; then
+               $SUMHASH "$file" > "${file}.$SUMHASH.${i}"
+           else
+	           ${i} -c $checknum "$file" | $SUMHASH > "${file}.$SUMHASH.${i}"
+	       fi
+	   done
+	done
+}
+
+#check files
+#check files (head) hash on boot if sha512sum
+# $1 = module thats being checked
+check_files_head()
+{
+   debug_log "check_files_head" "$*"
    local CFILE
    CFILE="$1"
-   if [ -f "$CFILE.$SUMHASH" ]; then
-      if [ "$(head -c $checknum $CFILE | $SUMHASH)" == "$(cat $CFILE.$SUMHASH)" ]; then
-          echolog "$CFILE OK"
+   if [ -f "$CFILE.$SUMHASH.head" ]; then
+      if [ "$(head -c $checknum $CFILE | $SUMHASH)" == "$(cat $CFILE.$SUMHASH.head)" ]; then
+          echolog "$CFILE (head) OK"
       else
-          echolog "$CFILE FAILED"
+          echolog "$CFILE (head) FAILED"
+      fi
+   fi
+}
+
+#check files
+#check files (tail) hash on boot if sha512sum
+# $1 = module thats being checked
+check_files_tail()
+{
+   debug_log "check_files_tail" "$*"
+   local CFILE
+   CFILE="$1"
+   if [ -f "$CFILE.$SUMHASH.tail" ]; then
+      if [ "$(tail -c $checknum $CFILE | $SUMHASH)" == "$(cat $CFILE.$SUMHASH.tail)" ]; then
+          echolog "$CFILE (tail) OK"
+      else
+          echolog "$CFILE (tail) FAILED"
       fi
    fi
 }
@@ -1048,7 +1085,8 @@ mount_bundles()
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          if [ "$checkfiles" == "y" ]; then
-            check_files "$1/$BUNDLE"
+            check_files_head "$1/$BUNDLE"
+            check_files_tail "$1/$BUNDLE"
          fi
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
@@ -1085,7 +1123,8 @@ mount_bundles_modpath()
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          if [ "$modcheckfiles" == "y" ]; then
-            check_files "$1/$BUNDLE"
+            check_files_head "$1/$BUNDLE"
+            check_files_tail "$1/$BUNDLE"
          fi
          mkdir -p "$2/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
