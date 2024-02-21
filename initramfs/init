@@ -14,7 +14,8 @@ CHANGES=$MEMORY/changes
 UNION=$MEMORY/union
 DATAMNT=$MEMORY/data
 BUNDLES=$MEMORY/b
-
+ENCRYPTFS=$DATAMNT/encryptfs
+HOME_ENCRYPTFS=$DATAMNT/home_encryptfs
 
 header "Live Kit init <http://www.linux-live.org/>"
 
@@ -62,7 +63,7 @@ fi
 check_data_found "$DATA"
 debug_shell
 # setup persistent changes, if possible
-persistent_changes "$DATAMNT" "$CHANGES"
+persistent_changes "$DATAMNT" "$CHANGES" "$ENCRYPTFS"
 debug_shell
 # copy to RAM if needed
 DATA="$(copy_to_ram "$DATA" "$CHANGES")"
@@ -103,11 +104,10 @@ echo "127.0.0.1 ${hostname}.example.net ${hostname}" >> ${UNION}/etc/hosts
 fi
 
 debug_shell
-
 #mount bind a $DATAMNT/$home folder to make it easier to update
 #ex home=folder then the folder mount bind $DATAMNT/folder
 #only mount 
-if [ ! -z "$home" -a -z "$homedat" ]; then
+if [ ! -z "$home" -a -z "$homedat" -a -z "$home_encryptfs" ]; then
 	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	if [ -d $DATAMNT/$home ]; then
 		mount -o bind $DATAMNT/$home $UNION/home
@@ -118,7 +118,16 @@ if [ ! -z "$home" -a ! -z "$homedat" ]; then
 	if [ -z "$homedatsize" ]; then
 		homedatsize="16000"
 	fi
-
+	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
+	#cipher = $ENCRYPTFS
+	#plain = $CHANGES
+	if [ "$home_encryptfs" == "y" -a "$HOME_ENCRYPTFS" != "" ]; then
+		[ -d "$HOME_ENCRYPTFS" ] || mkdir -p "$HOME_ENCRYPTFS"
+		if [ ! -f "$HOME_ENCRYPTFS/gocryptfs.conf" -a ! -f "$HOME_ENCRYPTFS/gocryptfs.diriv" ]; then
+			gocryptfs -init -xchacha "$HOME_ENCRYPTFS"
+		fi
+		gocryptfs -serialize_reads -allow_other "$HOME_ENCRYPTFS" "$DATAMNT/$home"
+	fi
 	if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
 		echo "* Restoring home"
 		EXISTS="true"
@@ -126,7 +135,6 @@ if [ ! -z "$home" -a ! -z "$homedat" ]; then
 		echo "* Creating new home"
 		EXISTS=""
     fi
-    [ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
 	@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$homedatsize" -m "$UNION/home" -p 4000
 	if [ "$EXISTS" ]; then
 		echo "- home filesystem check"

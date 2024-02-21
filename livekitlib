@@ -891,18 +891,19 @@ restore_perch_session()
 # Activate persistent changes
 # $1 = data directory
 # $2 = target changes directory
+# $3 = target encryptfs directory to store changes using gocryptfs
 #
 persistent_changes()
 {
    debug_log "persistent_changes" "$*"
 
-   local CHANGES T1 T2 EXISTS DEVICE PERCHDIR PERCHSIZE PERCHFILE GROWDIR
+   local CHANGES T1 T2 EXISTS DEVICE PERCHDIR PERCHSIZE PERCHFILE GROWDIR ENCRYPTFS
 
    CHANGES="$1/$(basename "$2")"
    DEVICE="$(df $1 | tail -n 1 | cut -d " " -f 1)"
    T1="$CHANGES/.empty"
    T2="$T1"2
-
+   ENCRYPTFS="$3"
    # Setup the directory anyway, it will be used in all cases
    mkdir -p "$2"
 
@@ -958,6 +959,16 @@ persistent_changes()
    fi
 
    PERCHFILE="$PERCHDIR/changes.dat"
+
+   #cipher = $ENCRYPTFS
+   #plain = $CHANGES
+   if [ "$encryptfs" == "y" -a "$ENCRYPTFS" != "" ]; then
+      [ -d "$ENCRYPTFS" ] || mkdir -p "$ENCRYPTFS"
+      if [ ! -f "$ENCRYPTFS/gocryptfs.conf" -a ! -f "$ENCRYPTFS/gocryptfs.diriv" ]; then
+		gocryptfs -init -xchacha "$ENCRYPTFS"
+      fi
+      gocryptfs -serialize_reads -allow_other "$ENCRYPTFS" "$CHANGES"
+   fi
 
    # resume or use new
    if [ -e "$CHANGES/$PERCHFILE" ]; then
