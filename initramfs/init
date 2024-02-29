@@ -72,11 +72,29 @@ DATA="$(copy_to_ram "$DATA" "$CHANGES")"
 mount_bundles "$DATA" "$BUNDLES"
 debug_shell
 
-if [ ! -z "$modpath" ]; then
+if [ ! -z "$modpath" -a -z "$encryptfsmodpath" ]; then
 	if [ -d "$DATAMNT"/"$modpath" ]; then
 		mount_bundles_modpath "$DATAMNT"/"$modpath" "$BUNDLES"
 	fi
 fi
+
+if [ ! -z "$encryptfsmodpath" -a -z "$modpath" ]; then
+	if [ -d "$DATAMNT/$encryptfsmodpath" ]; then
+      if [ -f "$DATAMNT/$encryptfsmodpath/gocryptfs.conf" -a -f "$DATAMNT/$encryptfsmodpath/gocryptfs.diriv" ]; then
+			[ -d "$MEMORY/modpath" ] || mkdir -p "$MEMORY/modpath"
+			if [ -f /passfile.txt ]; then
+				gocryptfs --force_owner 0:0 -passfile /passfile.txt -nonempty -serialize_reads -allow_other "$DATAMNT/$encryptfsmodpath" "$MEMORY/modpath"
+			else
+				gocryptfs --force_owner 0:0 -nonempty -serialize_reads -allow_other "$DATAMNT/$encryptfsmodpath" "$MEMORY/modpath"
+			fi
+	  else
+			echo "No gocryptfs.conf/gocryptfs.diriv file"
+	  fi
+	  mount_bundles_modpath "$MEMORY/modpath" "$BUNDLES"
+	fi
+fi
+
+
 debug_shell
 
 # init aufs union, or setup overlayfs union
@@ -126,7 +144,7 @@ if [ ! -z "$home" -a ! -z "$homedat" ]; then
 		if [ ! -f "$HOME_ENCRYPTFS/gocryptfs.conf" -a ! -f "$HOME_ENCRYPTFS/gocryptfs.diriv" ]; then
 			gocryptfs -init -xchacha "$HOME_ENCRYPTFS"
 		fi
-		gocryptfs -serialize_reads -allow_other "$HOME_ENCRYPTFS" "$DATAMNT/$home"
+		gocryptfs -nonempty -serialize_reads -allow_other "$HOME_ENCRYPTFS" "$DATAMNT/$home"
 	fi
 	if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
 		echo "* Restoring home"
