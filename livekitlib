@@ -131,10 +131,12 @@ create_bundle_sbo()
 make_check_files()
 {
 	for i in head tail full; do
-	   find -type f | grep -v $SUMHASH | while read file; do
+	   find -type f | grep -v $SUMHASH | sed 's|./||g' | while read file; do
            if [ "$i" == "full" ]; then
+               echo "$i $file"
                $SUMHASH "$file" > "${file}.$SUMHASH.${i}"
            else
+               echo "$i $file"
 	           ${i} -c $checknum "$file" | $SUMHASH > "${file}.$SUMHASH.${i}"
 	       fi
 	   done
@@ -313,9 +315,9 @@ init_union()
 				ln -s "$(basename $(echo "${n}" | sed "s|^${a}:||g"))" "$3"/"${a}"
 			done
 	   done
-			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type l | cat | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type l | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
       else
-         mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | cat | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+         mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
 		fi
    fi
 }
@@ -924,26 +926,26 @@ persistent_changes()
       echo "* Persistent changes not writable or not used"
       return
    fi
-
-   # try to use native fs if posix-compatible
-   echo_green_star
-   echo "Testing persistent changes for posix compatibility"
-   touch "$T1" && ln -sf "$T1" "$T2" 2>/dev/null && \
-   chmod +x "$T1" 2>/dev/null && test -x "$T1" && \
-   chmod -x "$T1" 2>/dev/null && test ! -x "$T1" && \
-   rm "$T1" "$T2" 2>/dev/null
-
-   if [ $? -eq 0 ]; then
-      if device_bestfs $DEVICE | grep -v ntfs >/dev/null; then
-         echo "* Activating native persistent changes for session #$PERCHDIR"
-         mount --bind "$CHANGES/$PERCHDIR" "$2"
-         return
-      fi
-   else
-      # if test failed at any point, we may have temp files left behind
+   if [ -z "$perchdat" ]; then
+      # try to use native fs if posix-compatible
+      echo_green_star
+      echo "Testing persistent changes for posix compatibility"
+      touch "$T1" && ln -sf "$T1" "$T2" 2>/dev/null && \
+      chmod +x "$T1" 2>/dev/null && test -x "$T1" && \
+      chmod -x "$T1" 2>/dev/null && test ! -x "$T1" && \
       rm "$T1" "$T2" 2>/dev/null
-   fi
 
+      if [ $? -eq 0 ]; then
+         if device_bestfs $DEVICE | grep -v ntfs >/dev/null; then
+            echo "* Activating native persistent changes for session #$PERCHDIR"
+            mount --bind "$CHANGES/$PERCHDIR" "$2"
+            return
+         fi
+      else
+         # if test failed at any point, we may have temp files left behind
+         rm "$T1" "$T2" 2>/dev/null
+      fi
+   fi
 
    # If we are here, native fs was not supported or user requested perchsize anyway
 
@@ -967,7 +969,7 @@ persistent_changes()
       if [ ! -f "$ENCRYPTFS/gocryptfs.conf" -a ! -f "$ENCRYPTFS/gocryptfs.diriv" ]; then
 		gocryptfs -init -xchacha "$ENCRYPTFS"
       fi
-      gocryptfs -serialize_reads -allow_other "$ENCRYPTFS" "$CHANGES"
+      gocryptfs --force_owner 0:0 -nonempty -serialize_reads -allow_other "$ENCRYPTFS" "$CHANGES"
    fi
 
    # resume or use new
@@ -996,6 +998,56 @@ persistent_changes()
    mount -o loop "$2/virtual.dat" "$2"
 }
 
+#this is to make a home.dat file even on a ext4 filesystem
+# $1 = DATAMNT
+# $2 = UNION
+home_dat()
+{
+
+	local HOMEDATSIZE DATAMNT UNION
+	DATAMNT=$1
+	UNION=$2
+
+	if [ ! -z "$home" -a ! -z "$homedat" ]; then
+		HOMEDATSIZE=$(cmdline_value homedatsize | sed -r "s/TB?/000000/i" | sed -r "s/GB?/000/i" | sed -r "s/[^0-9]//g")
+		if [ -z "$homedatsize" ]; then
+			HOMEDATSIZE="16000"
+		fi
+
+		# minimum size is 16GB
+		if [ "$HOMEDATSIZE" -lt 16000 ]; then
+			HOMEDATSIZE="16000"
+		fi
+		[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
+		#cipher = $ENCRYPTFS
+		#plain = $CHANGES
+		if [ "$home_encryptfs" == "y" -a "$HOME_ENCRYPTFS" != "" ]; then
+		[ -d "$HOME_ENCRYPTFS" ] || mkdir -p "$HOME_ENCRYPTFS"
+			if [ ! -f "$HOME_ENCRYPTFS/gocryptfs.conf" -a ! -f "$HOME_ENCRYPTFS/gocryptfs.diriv" ]; then
+				gocryptfs -init -xchacha "$HOME_ENCRYPTFS"
+			fi
+			gocryptfs -nonempty -serialize_reads -allow_other "$HOME_ENCRYPTFS" "$DATAMNT/$home"
+		fi
+		if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
+			echo "* Restoring home"
+			EXISTS="true"
+		else
+			echo "* Creating new home"
+			EXISTS=""
+		fi
+		@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$HOMEDATSIZE" -m "$UNION/home" -p 4000
+		if [ "$EXISTS" ]; then
+			echo "- home filesystem check"
+			e2fsck -y "$UNION/home/virtual.dat" >>/var/log/homedat.fsck.log 2>&1
+			echo "- home filesystem grow if needed"
+			resize2fs -f "$UNION/home/virtual.dat" >>/var/log/homedat.resize.log 2>&1
+		else
+			echo "- home filesystem creation"
+			mke2fs -t ext4 -F "$UNION/home/virtual.dat" >/dev/null 2>&1
+		fi
+		mount -o loop,sync "$UNION/home/virtual.dat" "$UNION/home"
+	fi
+}
 
 # Copy content of rootcopy directory to union
 # $1 = data directory
@@ -1091,29 +1143,32 @@ mount_bundles()
    if [ -z "$dfcachesize" ]; then
       dfcachesize="32M"
    fi
+   local BUNDLES MNTBUNDLES
+   BUNDLES="$1"
+   MNTBUNDLES="$2"
    for EXT in $BEXT $BOEXT $DFBEXT $EFBEXT; do
       ( ls -1 "$1" | sort -n ; cd "$1" ; find modules/ 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          if [ "$checkfiles" == "y" ]; then
-            check_files_head "$1/$BUNDLE"
-            check_files_tail "$1/$BUNDLE"
+            check_files_head "$BUNDLES/$BUNDLE"
+            check_files_tail "$BUNDLES/$BUNDLE"
          fi
-         mkdir -p "$2/$BUN"
+         mkdir -p "$MNTBUNDLES/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
-            mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+            mount -o loop,ro -t squashfs "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$BOEXT" ]; then
 			LOOPD="$(losetup -f)"
 			LOOPN="$(echo "$LOOPD" | sed 's|/dev/loop||g')"
 			if [ ! -e $LOOPD ]; then
 				mknod $LOOPD b 7 $LOOPN
 			fi
-			losetup "$LOOPD" "$1/$BUNDLE" -o $OFFSET
-			mount "$LOOPD" "$2/$BUN"
+			losetup "$LOOPD" "$BUNDLES/$BUNDLE" -o $OFFSET
+			mount "$LOOPD" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
+            "$DFCMD" "$DFOPTION" "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
-            mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
+            mount -o loop,ro -t erofs "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN"
          fi
       done
    done
@@ -1129,29 +1184,32 @@ mount_bundles_modpath()
    if [ -z "$dfcachesize" ]; then
       dfcachesize="32M"
    fi
+   local BUNDLES MNTBUNDLES
+   BUNDLES="$1"
+   MNTBUNDLES="$2"
    for EXT in $BEXT $BOEXT $DFBEXT $EFBEXT; do
-      ( ls -1 "$1" | sort -n ; cd "$1" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
+      ( ls -1 "$BUNDLES" | sort -n ; cd "$BUNDLES" ; find 2>/dev/null | sortmod | filter_load) | grep '[.]'$EXT'$' | filter_noload | sed 's|^./||g' | while read BUNDLE; do
          echo "* $BUNDLE"
          BUN="$(basename "$BUNDLE")"
          if [ "$modcheckfiles" == "y" ]; then
-            check_files_head "$1/$BUNDLE"
-            check_files_tail "$1/$BUNDLE"
+            check_files_head "$BUNDLES/$BUNDLE"
+            check_files_tail "$BUNDLES/$BUNDLE"
          fi
-         mkdir -p "$2/$BUN"
+         mkdir -p "$MNTBUNDLES/$BUN"
          if [ "$EXT" == "$BEXT" ]; then
-            mount -o loop,ro -t squashfs "$1/$BUNDLE" "$2/$BUN"
+            mount -o loop,ro -t squashfs "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$BOEXT" ]; then
 			LOOPD="$(losetup -f)"
 			LOOPN="$(echo "$LOOPD" | sed 's|/dev/loop||g')"
 			if [ ! -e $LOOPD ]; then
 				mknod $LOOPD b 7 $LOOPN
 			fi
-			losetup "$LOOPD" "$1/$BUNDLE" -o $OFFSET
-			mount "$LOOPD" "$2/$BUN"
+			losetup "$LOOPD" "$BUNDLES/$BUNDLE" -o $OFFSET
+			mount "$LOOPD" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
-            "$DFCMD" "$DFOPTION" "$1/$BUNDLE" "$2/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
+            "$DFCMD" "$DFOPTION" "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
-            mount -o loop,ro -t erofs "$1/$BUNDLE" "$2/$BUN"
+            mount -o loop,ro -t erofs "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN"
          fi
        done
    done

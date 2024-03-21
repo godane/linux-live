@@ -132,39 +132,7 @@ if [ ! -z "$home" -a -z "$homedat" -a -z "$home_encryptfs" ]; then
 	fi
 fi
 
-if [ ! -z "$home" -a ! -z "$homedat" ]; then
-	if [ -z "$homedatsize" ]; then
-		homedatsize="16000"
-	fi
-	[ -d $DATAMNT/$home ] || mkdir -p $DATAMNT/$home
-	#cipher = $ENCRYPTFS
-	#plain = $CHANGES
-	if [ "$home_encryptfs" == "y" -a "$HOME_ENCRYPTFS" != "" ]; then
-		[ -d "$HOME_ENCRYPTFS" ] || mkdir -p "$HOME_ENCRYPTFS"
-		if [ ! -f "$HOME_ENCRYPTFS/gocryptfs.conf" -a ! -f "$HOME_ENCRYPTFS/gocryptfs.diriv" ]; then
-			gocryptfs -init -xchacha "$HOME_ENCRYPTFS"
-		fi
-		gocryptfs -nonempty -serialize_reads -allow_other "$HOME_ENCRYPTFS" "$DATAMNT/$home"
-	fi
-	if [ -e "$DATAMNT/$home/$home.dat.0" ]; then
-		echo "* Restoring home"
-		EXISTS="true"
-	else
-		echo "* Creating new home"
-		EXISTS=""
-    fi
-	@mount.dynfilefs -f "$DATAMNT/$home/$home.dat" -s "$homedatsize" -m "$UNION/home" -p 4000
-	if [ "$EXISTS" ]; then
-		echo "- home filesystem check"
-		e2fsck -y "$UNION/home/virtual.dat" >>/var/log/homedat.fsck.log 2>&1
-		echo "- home filesystem grow if needed"
-		resize2fs -f "$UNION/home/virtual.dat" >>/var/log/homedat.resize.log 2>&1
-	else
-		echo "- home filesystem creation"
-		mke2fs -t ext4 -F "$UNION/home/virtual.dat" >/dev/null 2>&1
-	fi
-	mount -o loop,sync "$UNION/home/virtual.dat" "$UNION/home"
-fi
+home_dat "$DATAMNT" "$UNION"
 
 debug_shell
 
@@ -207,7 +175,7 @@ if [ ! -z "$user" ]; then
 fi
 debug_shell
 
-#copy the password files to $DATA/rootcopy if $home is used
+#copy the password files to /tmp1 if $home is used
 if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
 		[ -d /tmp1/etc ] || mkdir -p /tmp1/etc
