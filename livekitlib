@@ -314,14 +314,13 @@ init_union()
 				echo "Module $n : $a"
 				ln -s "$(basename $(echo "${n}" | sed "s|^${a}:||g"))" "$3"/"${a}"
 			done
-	   done
+        done
 			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type l | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
       else
-         mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
-		fi
+			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type d | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+      fi
    fi
 }
-
 
 # Return device mounted for given directory
 # $1 = directory
@@ -375,6 +374,7 @@ mounted_dir()
 init_blkid_cache()
 {
    local DEV
+   debug_log "init_blkid_cache" "$*"
    cat /proc/partitions | tr -s " " |  cut -d " " -f 5 | while read DEV; do
       blkid /dev/$DEV >/dev/null 2>/dev/null
    done
@@ -383,6 +383,7 @@ init_blkid_cache()
 ventoy_drive_label_device()
 {
    local DEV
+   debug_log "ventoy_drive_label_device" "$*"
    cat /proc/partitions | tr -s " " |  cut -d " " -f 5 | grep ^[a-z] | while read DEV; do
       if [ "$(device_tag /dev/$DEV LABEL | grep ^Ventoy)" != "" ]; then
 		echo "/dev/$DEV"
@@ -1224,9 +1225,10 @@ union_append_bundles()
    debug_log "union_append_bundles" "$*"
 
    if [ ! -z $forceaufs ]; then
+      local BUNDLE
       echo_green_star
       echo "Adding bundles to union"
-      find "$1" -mindepth 1 -maxdepth 1 | sortmod | while read BUNDLE; do
+      find "$1" -mindepth 1 -maxdepth 1 | sort | while read BUNDLE; do
          mount -o remount,add:1:"$BUNDLE=rr+wh" aufs "$2"
       done
    fi
