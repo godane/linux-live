@@ -16,23 +16,32 @@ DATAMNT=$MEMORY/data
 BUNDLES=$MEMORY/b
 ENCRYPTFS=$DATAMNT/encryptfs
 HOME_ENCRYPTFS=$DATAMNT/home_encryptfs
+SAVEDIR_ENCRYPTFS=$DATAMNT/savedir_encryptfs
+
 
 header "Live Kit init <http://www.linux-live.org/>"
+
+
+# load some modules manually first, then modprobe everything we have
+# modprobe all devices excluding network drivers
+modprobe_everything -v /drivers/net/
 
 init_proc_sysfs
 
 debug_start
 debug_shell
-# load some modules manually first, then modprobe everything we have
-# modprobe all devices excluding network drivers
-modprobe_everything -v /drivers/net/
+
+#modprobe usb-storage quirks=152d:0562:u
 
 init_devs
 init_aufs
 init_zram
 
+init_devs
+
 # initialize blkid cache file
 init_blkid_cache
+
 debug_shell
 if [[ -d /ventoy ]]
 then
@@ -136,6 +145,19 @@ home_dat "$DATAMNT" "$UNION"
 
 debug_shell
 
+if [ ! -z "$savedir" -a -z "$savedirdat" -a -z "$savedir_encryptfs" ]; then
+	[ -d $DATAMNT/savedir/$savedir ] || mkdir -p $DATAMNT/savedir/$savedir
+	if [ -d $DATAMNT/savedir/$savedir ]; then
+		[ -d $UNION/$savedir ] || mkdir -p $UNION/$savedir
+		[ -d $CHANGES/.rootfs/$savedir ] || mkdir -p $CHANGES/.rootfs/$savedir
+		[ -d $DATAMNT/savedir/$savedir/.savedir ] || mkdir -p $DATAMNT/savedir/$savedir/.savedir
+		[ -d $DATAMNT/savedir/$savedir/.work ] || mkdir -p $DATAMNT/savedir/$savedir/.work
+		mount -t overlay overlay -o lowerdir=$UNION/$savedir,upperdir=$DATAMNT/savedir/$savedir/.savedir,workdir=$DATAMNT/savedir/$savedir/.work $UNION/$savedir
+	fi
+fi
+
+debug_shell
+
 #setup user and password
 if [ ! -z "$user" ]; then
 	if [ ! -d $UNION/home/$user ]; then
@@ -229,6 +251,18 @@ debug_shell
 if [ ! -z "$keyboard" ]; then
 	echo "setting keyboard to $keyboard"
 	chroot $UNION localectl set-keymap "$keyboard"
+fi
+
+if [ -d /ventoy ]; then
+	if [ ! -f $CHANGES/.ventoyignore ]; then
+		touch $CHANGES/.ventoyignore
+	fi
+	if [ ! -f $DATAMNT/$home/.ventoyignore ]; then
+		touch $DATAMNT/$home/.ventoyignore
+	fi
+	if [ -! -f $DATAMNT/savedir/.ventoyignore ]; then
+		touch $DATAMNT/savedir/.ventoyignore
+	fi
 fi
 
 debug_shell
