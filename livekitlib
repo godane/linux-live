@@ -1050,6 +1050,61 @@ home_dat()
 	fi
 }
 
+#this is to make a $savedir.dat file even on a ext4 filesystem
+# $1 = DATAMNT
+# $2 = SAVEDIR
+# $3 = SAVEDIRMNT
+savedir_dat()
+{
+
+	local SAVEDIRDATSIZE DATAMNT
+	DATAMNT=$1
+	SAVEDIR=$2
+	SAVEDIRMNT=$3
+
+	if [ ! -z "$savedir" -a ! -z "$savedirdat" ]; then
+		SAVEDIRDATSIZE=$(cmdline_value savedirdatsize | sed -r "s/TB?/000000/i" | sed -r "s/GB?/000/i" | sed -r "s/[^0-9]//g")
+		if [ -z "$savedirdatsize" ]; then
+			SAVEDIRDATSIZE="16000"
+		fi
+
+		# minimum size is 16GB
+		if [ "$SAVEDIRDATSIZE" -lt 16000 ]; then
+			SAVEDIRDATSIZE="16000"
+		fi
+		[ -d $DATAMNT ] || mkdir -p $DATAMNT
+		[ -d $SAVEDIR ] || mkdir -p $SAVEDIR
+		[ -d $SAVEDIRMNT ] || mkdir -p $SAVEDIRMNT
+		#cipher = $ENCRYPTFS
+		#plain = $CHANGES
+		if [ "$savedir_encryptfs" == "y" -a "$SAVEDIR_ENCRYPTFS" != "" ]; then
+		[ -d "$SAVEDIR_ENCRYPTFS" ] || mkdir -p "$SAVEDIR_ENCRYPTFS"
+			if [ ! -f "$SAVEDIR_ENCRYPTFS/gocryptfs.conf" -a ! -f "$SAVEDIR_ENCRYPTFS/gocryptfs.diriv" ]; then
+				gocryptfs -init -xchacha "$SAVEDIR_ENCRYPTFS"
+			fi
+			gocryptfs -nonempty -serialize_reads -allow_other "$SAVEDIR_ENCRYPTFS" "$SAVEDIR"
+		fi
+		if [ -e "$SAVEDIR/$savedir.dat.0" ]; then
+			echo "* Restoring $savedir"
+			EXISTS="true"
+		else
+			echo "* Creating new home"
+			EXISTS=""
+		fi
+		@mount.dynfilefs -f "$SAVEDIR/$savedir.dat" -s "$SAVEDIRDATSIZE" -m "$DATAMNT" -p 4000
+		if [ "$EXISTS" ]; then
+			echo "- $savedir filesystem check"
+			e2fsck -y "$DATAMNT/virtual.dat" >>/var/log/savedirdat.fsck.log 2>&1
+			echo "- $savedir filesystem grow if needed"
+			resize2fs -f "$DATAMNT/virtual.dat" >>/var/log/savedirdat.resize.log 2>&1
+		else
+			echo "- $savedir filesystem creation"
+			mke2fs -t ext4 -F "$DATAMNT/virtual.dat" >/dev/null 2>&1
+		fi
+		mount -o loop,sync "$DATAMNT/virtual.dat" "$SAVEDIRMNT"
+	fi
+}
+
 # Copy content of rootcopy directory to union
 # $1 = data directory
 # $2 = union directory

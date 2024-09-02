@@ -156,6 +156,21 @@ if [ ! -z "$savedir" -a -z "$savedirdat" -a -z "$savedir_encryptfs" ]; then
 	fi
 fi
 
+savedir_dat "$DATAMNT/savedir/${savedir}-dat-mount" "$DATAMNT/savedir/${savedir}-dat" "$DATAMNT/savedir/${savedir}"
+
+
+if [ ! -z "$savedir" -a ! -z "$savedirdat" ]; then
+	[ -d $DATAMNT/savedir/$savedir ] || mkdir -p $DATAMNT/savedir/$savedir
+	if [ -d $DATAMNT/savedir/$savedir ]; then
+		[ -d $UNION/$savedir ] || mkdir -p $UNION/$savedir
+		[ -d $CHANGES/.rootfs/$savedir ] || mkdir -p $CHANGES/.rootfs/$savedir
+		[ -d $DATAMNT/savedir/$savedir/.savedir ] || mkdir -p $DATAMNT/savedir/$savedir/.savedir
+		[ -d $DATAMNT/savedir/$savedir/.work ] || mkdir -p $DATAMNT/savedir/$savedir/.work
+		mount -t overlay overlay -o lowerdir=$UNION/$savedir,upperdir=$DATAMNT/savedir/$savedir/.savedir,workdir=$DATAMNT/savedir/$savedir/.work $UNION/$savedir
+	fi
+fi
+
+
 debug_shell
 
 #setup user and password
