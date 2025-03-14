@@ -1051,9 +1051,9 @@ home_dat()
 }
 
 #this is to make a $savedir.dat file even on a ext4 filesystem
-# $1 = DATAMNT
-# $2 = SAVEDIR
-# $3 = SAVEDIRMNT
+# $1 = DATAMNT = where the dat is mount (where to access virtual.dat file) ("$DATAMNT/savedir/${savedir}-dat-mount")
+# $2 = SAVEDIR = where the dat files is saved ("$DATAMNT/savedir/${savedir}-dat" )
+# $3 = SAVEDIRMNT = the folder where files are saved ("$DATAMNT/savedir/${savedir}")
 savedir_dat()
 {
 

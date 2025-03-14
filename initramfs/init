@@ -16,7 +16,7 @@ DATAMNT=$MEMORY/data
 BUNDLES=$MEMORY/b
 ENCRYPTFS=$DATAMNT/encryptfs
 HOME_ENCRYPTFS=$DATAMNT/home_encryptfs
-SAVEDIR_ENCRYPTFS=$DATAMNT/savedir_encryptfs
+SAVEDIR_ENCRYPTFS=$DATAMNT/savedir/savedir_encryptfs
 
 
 header "Live Kit init <http://www.linux-live.org/>"
@@ -145,6 +145,7 @@ home_dat "$DATAMNT" "$UNION"
 
 debug_shell
 
+# this is for when you use ext4 or (posix-compible filesystem) to just mount bind the $DATAMNT/savedir/$savedir 
 if [ ! -z "$savedir" -a -z "$savedirdat" -a -z "$savedir_encryptfs" ]; then
 	[ -d $DATAMNT/savedir/$savedir ] || mkdir -p $DATAMNT/savedir/$savedir
 	if [ -d $DATAMNT/savedir/$savedir ]; then
@@ -242,13 +243,18 @@ if [ ! -z "$autologin" ]; then
 		echo "autologin-user=$user" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
 		echo "autologin-user-timeout=0" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
 	fi
+	echo "[Autologin]" > $UNION/etc/sddm.conf
+	echo "Session=Lubuntu" >> $UNION/etc/sddm.conf
+	echo "User=$user" >> $UNION/etc/sddm.conf
 fi
+
 debug_shell
 #timezone
 if [ ! -z "$timezone" ]; then
 	if [ -f $UNION/usr/share/zoneinfo/$timezone ]; then
 		echo "Timezone $timezone"
 		ln -sf /usr/share/zoneinfo/$timezone $UNION/etc/localtime
+		echo "$timezone" > $UNION/etc/timezone
 	fi
 fi
 debug_shell
@@ -275,7 +281,7 @@ if [ -d /ventoy ]; then
 	if [ ! -f $DATAMNT/$home/.ventoyignore ]; then
 		touch $DATAMNT/$home/.ventoyignore
 	fi
-	if [ -! -f $DATAMNT/savedir/.ventoyignore ]; then
+	if [ ! -f $DATAMNT/savedir/.ventoyignore ]; then
 		touch $DATAMNT/savedir/.ventoyignore
 	fi
 fi
