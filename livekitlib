@@ -306,18 +306,21 @@ init_union()
       mkdir -p "$1/.rootfs"
       mkdir -p "$1/.work"
 
+	  find "$3" -mindepth 1 -maxdepth 1 | cat | sort > /tmp/bundles.txt
+	  grep -n "$3" /tmp/bundles.txt | sed 's|:.*||g' | tac | sed "s|^|$3/|g" | tr '\n' ':' | sed -r  's/:$//'  > /tmp/lowerdir.txt
+	  #tac linenum.txt | sed "s|^|$3|g" | tr '\n' ':' | sed -r  's/:$//' > /tmp/lowerdir.txt
       if [ ! -z "$toomany" ]; then
-         find "$3" -mindepth 1 -maxdepth 1 | cat | sort > /tmp/bundles.txt
-         max="$(cat /tmp/bundles.txt | wc -l)"
+        max="$(cat /tmp/bundles.txt | wc -l)"
+        lowerdir="$(cat /tmp/lowerdir.txt)"
         for a in $(seq 1 $max); do
-			grep -n ^/m /tmp/bundles.txt | grep "$a:" | head -1 | while read n; do
+			grep -n ^"$3" /tmp/bundles.txt | grep "$a:" | head -1 | while read n; do
 				echo "Module $n : $a"
 				ln -s "$(basename $(echo "${n}" | sed "s|^${a}:||g"))" "$3"/"${a}"
 			done
         done
-			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type l | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+			mount -t overlay overlay -o lowerdir=$lowerdir,upperdir=$1/.rootfs,workdir=$1/.work $2
       else
-			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type d | tac | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
+			mount -t overlay overlay -o lowerdir=$(find "$3" -mindepth 1 -maxdepth 1 -type d | cat | tr '\n' ':' | sed -r  's/:$//'),upperdir=$1/.rootfs,workdir=$1/.work $2
       fi
    fi
 }
