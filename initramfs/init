@@ -113,22 +113,8 @@ init_union "$CHANGES" "$UNION" "$BUNDLES"
 union_append_bundles "$BUNDLES" "$UNION"
 
 debug_shell
-hostname="$(cat /proc/cmdline | grep hostname= | sed 's|.*hostname=||g' | sed 's| .*||g')"
 
-if [ ! -z "$hostname" ]; then
-echo "* Change hostname to $hostname"
-# Configure hostname and network:
-#echo "${hostname}.example.net" > ${UNION}/etc/HOSTNAME
-echo "${hostname}" > ${UNION}/etc/hostname
-if [ -f ${UNION}/etc/NetworkManager/NetworkManager.conf ]; then
-  sed -i ${UNION}/etc/NetworkManager/NetworkManager.conf -e "s/^hostname=.*/hostname=${hostname}/"
-fi
-echo "127.0.0.1 localhost" > ${UNION}/etc/hosts
-echo "::1 localhost ip6-localhost ip6-loopback" >> ${UNION}/etc/hosts
-echo "ff02::1 ip6-allnodes" >> ${UNION}/etc/hosts
-echo "ff02::2 ipt-allrouters" >> ${UNION}/etc/hosts
-echo "127.0.0.1 ${hostname}.example.net ${hostname}" >> ${UNION}/etc/hosts
-fi
+setup_hostname "$UNION"
 
 debug_shell
 #mount bind a $DATAMNT/$home folder to make it easier to update
@@ -174,43 +160,8 @@ fi
 
 debug_shell
 
-#setup user and password
-if [ ! -z "$user" ]; then
-	if [ ! -d $UNION/home/$user ]; then
-		[ -d $UNION/home ] || mkdir -p $UNION/home
-		echo "Setting up $user"
-		#chroot $UNION /usr/sbin/useradd -m -g users -s /bin/bash $user
-		#chroot $UNION /usr/sbin/usermod -G wheel,audio,cdrom,floppy,plugdev,video,power,netdev,lp,scanner,kmem $user
-		chroot $UNION useradd -m -g users -s /bin/bash $user
-		chroot $UNION useradd -m -g users -s /bin/bash $user
-		chroot $UNION usermod -G audio,cdrom,floppy,plugdev,video,netdev,lp,kmem,sudo $user
-		#if this is added with kali linux it would fail the all groups so best to do it by itself
-		chroot $UNION usermod -a -G scanner $user
-		debug_shell
-		echo "Setting up /home/$user folder"
-		chroot $UNION mkhomedir_helper $user
-		echo "Setting up $user password"
-		echo "$user:$user" > $UNION/tmp/chpasswd.tmp
-		#chroot $UNION /usr/sbin/chpasswd < $UNION/tmp/chpasswd.tmp
-		chroot $UNION chpasswd < $UNION/tmp/chpasswd.tmp
-		debug_shell
-		
-		rm -f $UNION/tmp/chpasswd.tmp
-		# Configure suauth:
-		#echo "Configure suauth"
-		#echo "root:${user}:OWNPASS" > ${UNION}/etc/suauth
-		#echo "root:ALL EXCEPT GROUP users:DENY" >> ${UNION}/etc/suauth
-		#chmod 600 ${UNION}/etc/suauth
+setup_homeuser "$user" "$UNION"
 
-		# Configure sudoers:
-		#echo "Configure sudoers"
-		#chmod 640 ${UNION}/etc/sudoers
-		#sed -i ${UNION}/etc/sudoers -e 's/# *\(%users\sALL=(ALL)\sALL\)/\1/'
-		#chmod 440 ${UNION}/etc/sudoers
-	else
-		echo "/home/$user folder exists."
-	fi
-fi
 debug_shell
 
 #copy the password files to /tmp1 if $home is used
@@ -237,42 +188,20 @@ fi
 debug_shell
 
 if [ ! -z "$autologin" ]; then
-	echo "setting up lightdm autologin of user $user"
-	if [ -d $UNION/etc/lightdm/lightdm.conf.d ]; then
-		echo "[Seat:*]" > $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
-		echo "autologin-user=$user" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
-		echo "autologin-user-timeout=0" >> $UNION/etc/lightdm/lightdm.conf.d/01_${user}.conf
-	fi
-	echo "[Autologin]" > $UNION/etc/sddm.conf
-	echo "Session=Lubuntu" >> $UNION/etc/sddm.conf
-	echo "User=$user" >> $UNION/etc/sddm.conf
+	setup_autologin "$user" "$UNION"
 fi
 
 debug_shell
-#timezone
-if [ ! -z "$timezone" ]; then
-	if [ -f $UNION/usr/share/zoneinfo/$timezone ]; then
-		echo "Timezone $timezone"
-		ln -sf /usr/share/zoneinfo/$timezone $UNION/etc/localtime
-		echo "$timezone" > $UNION/etc/timezone
-	fi
-fi
+
+setup_timezone "$timezone" "$UNION"
+
 debug_shell
 
-if [ ! -z "$locale" ]; then
-	echo "Locale ${locale}.UTF-8"
-	sed -i 's|^LC_ALL=.*||g' $UNION/etc/environment
-	echo "LC_ALL=${locale}.UTF-8" | tee -a $UNION/etc/environment
-	echo "${locale}.UTF-8 UTF-8" | tee $UNION/etc/locale.gen
-	echo "LANG=${locale}.UTF-8" | tee $UNION/etc/locale.conf
-	echo "chroot $UNION locale-gen ${locale}.UTF-8"
-	chroot $UNION locale-gen ${locale}.UTF-8
-fi
+setup_locale "$locale" "$UNION"
+
 debug_shell
-if [ ! -z "$keyboard" ]; then
-	echo "setting keyboard to $keyboard"
-	chroot $UNION localectl set-keymap "$keyboard"
-fi
+
+setup_keyboard "$keyboard" "$UNION"
 
 if [ -d /ventoy ]; then
 	if [ ! -f $CHANGES/.ventoyignore ]; then
