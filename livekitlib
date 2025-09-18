@@ -325,6 +325,151 @@ init_union()
    fi
 }
 
+# setup_hostname
+# $1 = $UNION
+setup_hostname() {
+
+   debug_log "setup_hostname" "$*"
+   local HOSTNAME
+   local UNION="$1"
+   HOSTNAME="$(cat /proc/cmdline | grep hostname= | sed 's|.*hostname=||g' | sed 's| .*||g')"
+
+   if [ ! -z "$HOSTNAME" ]; then
+      echo "* Change hostname to $HOSTNAME"
+      # Configure hostname and network:
+      #echo "${hostname}.example.net" > ${UNION}/etc/HOSTNAME
+      echo "${HOSTNAME}" > ${UNION}/etc/hostname
+      if [ -f ${UNION}/etc/NetworkManager/NetworkManager.conf ]; then
+         sed -i ${UNION}/etc/NetworkManager/NetworkManager.conf -e "s/^hostname=.*/hostname=${HOSTNAME}/"
+      fi
+      echo "127.0.0.1 localhost" > ${UNION}/etc/hosts
+      echo "::1 localhost ip6-localhost ip6-loopback" >> ${UNION}/etc/hosts
+      echo "ff02::1 ip6-allnodes" >> ${UNION}/etc/hosts
+      echo "ff02::2 ipt-allrouters" >> ${UNION}/etc/hosts
+      echo "127.0.0.1 ${hostname}.example.net ${HOSTNAME}" >> ${UNION}/etc/hosts
+   fi
+}
+
+# setup_homeuser
+# $1 = user
+# $2 = union
+setup_homeuser() {
+
+   local USER="$1"
+   local UNION="$2"
+
+   usergroups="dialout,cdrom,floppy,audio,video,plugdev,users,fuse,plugdev,netdev,powerdev,scanner,bluetooth,weston-launch,kvm,libvirt,libvirt-qemu,vboxusers,lpadmin,lp,kmem,dip,sambashare,docker,wireshark,sudo"
+
+   #usergroups="audio,cdrom,floppy,plugdev,video,netdev,lp,kmem,sudo"
+   #setup user and password
+   if [ ! -z "$USER" -a ! -z "$UNION" ]; then
+      if [ ! -d $UNION/home/$USER ]; then
+		[ -d $UNION/home ] || mkdir -p $UNION/home
+		echo "Setting up $USER"
+		chroot $UNION useradd -m -g users -s /bin/bash $USER
+		chroot $UNION useradd -m -g users -s /bin/bash $USER
+		chroot $UNION usermod -G $usergroups $USER
+		#if this is added with kali linux it would fail the all groups so best to do it by itself
+		chroot $UNION usermod -a -G scanner $USER
+		debug_shell
+		echo "Setting up /home/$USER folder"
+		chroot $UNION mkhomedir_helper $user
+		echo "Setting up $USER password"
+		echo "$USER:$USER" > $UNION/tmp/chpasswd.tmp
+		chroot $UNION chpasswd < $UNION/tmp/chpasswd.tmp
+		debug_shell
+		rm -f $UNION/tmp/chpasswd.tmp
+		echo "${USER} ALL=(ALL) NOPASSWD: ALL" > $UNION/etc/sudoers.d/$USER
+		chmod 0440 $UNION/etc/sudoers.d/$USER
+		if [ -f "$UNION/home/${USER}/.xscreensaver" ]; then
+			if [ "$(grep -qs '^lock:' "$UNION/home/${USER}/.xscreensaver")" == "" ] ; then
+				echo "lock: False" >> "$UNION/home/${USER}/.xscreensaver"
+			fi
+		fi
+   else
+      echo "/home/$USER folder exists."
+   fi
+fi
+
+}
+
+# setup_locale
+# $1 = locale
+# $2 = union
+setup_locale() {
+   local LOCALE="$1"
+   local UNION="$2"
+
+   if [ ! -z "LOCALE" -a ! -z "$UNION" ]; then
+      echo "Locale ${LOCALE}.UTF-8"
+      sed -i 's|^LC_ALL=.*||g' $UNION/etc/environment
+      echo "LC_ALL=${LOCALE}.UTF-8" | tee -a $UNION/etc/environment
+      echo "${LOCALE}.UTF-8 UTF-8" | tee $UNION/etc/locale.gen
+      echo "LANG=${LOCALE}.UTF-8" | tee $UNION/etc/locale.conf
+      echo "LANG=${LOCALE}.UTF-8" | tee $UNION/etc/default/locale
+      echo "chroot $UNION locale-gen ${LOCALE}.UTF-8"
+      chroot $UNION locale-gen ${LOCALE}.UTF-8
+   fi
+}
+
+# setup_keyboard
+# $1 = keyboard
+# $2 = union
+setup_keyboard() {
+   local KEYBOARD="$1"
+   local UNION="$2"
+   if [ ! -z "$KEYBOARD" -a ! -z "$UNION"  ]; then
+      echo "setting keyboard to $KEYBOARD"
+      chroot $UNION localectl set-keymap "$KEYBOARD"
+   fi
+}
+
+# setup_timezone
+# $1 = timezone
+# $2 = union
+setup_timezone() {
+   local TIMEZONE="$1"
+   local UNION="$2"
+   if [ -f $UNION/usr/share/zoneinfo/$TIMEZONE ]; then
+      echo "Timezone $TIMEZONE"
+      ln -sf /usr/share/zoneinfo/$TIMEZONE $UNION/etc/localtime
+      echo "$TIMEZONE" > $UNION/etc/timezone
+   fi
+}
+
+# setup_autologin
+# $1 = user
+# $2 = union
+setup_autologin() {
+   local USER="$1"
+   local UNION="$2"
+   echo "setting up lightdm autologin of user $USER"
+	if [ -d $UNION/etc/lightdm ]; then
+		mkdir -p $UNION/etc/lightdm/lightdm.conf.d
+	fi
+	if [ -d $UNION/etc/lightdm/lightdm.conf.d ]; then
+		echo "[Seat:*]" > $UNION/etc/lightdm/lightdm.conf.d/01_${USER}.conf
+		echo "autologin-user=$USER" >> $UNION/etc/lightdm/lightdm.conf.d/01_${USER}.conf
+		echo "autologin-user-timeout=0" >> $UNION/etc/lightdm/lightdm.conf.d/01_${USER}.conf
+	fi
+	if [ -f $UNION/etc/sddm.conf.d/lubuntu_settings.conf ]; then
+		echo "[Autologin]" > $UNION/etc/sddm.conf.d/lubuntu_settings.conf
+		echo "Session=Lubuntu" >> $UNION/etc/sddm.conf.d/lubuntu_settings.conf
+		echo "User=$USER" >> $UNION/etc/sddm.conf.d/lubuntu_settings.conf
+	fi
+	if [ -f $UNION/etc/gdm3/custom.conf ]; then
+		cp $UNION/etc/gdm3/custom.conf $UNION/etc/gdm3/daemon.conf
+
+	   _GDM3_OPTIONS="AutomaticLoginEnable=true\n\
+AutomaticLogin=${user}\n\
+TimedLoginEnable=true\n\
+TimedLogin=${user}\n\
+TimedLoginDelay=5"
+
+		sed -i -e "s|\[daemon\]|\[daemon\]\n${_GDM3_OPTIONS}|" $UNION/etc/gdm3/daemon.conf
+	fi
+}
+
 # Return device mounted for given directory
 # $1 = directory
 #
