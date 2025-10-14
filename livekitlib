@@ -1513,6 +1513,8 @@ change_root()
    if [ -x sbin/chroot -o -L sbin/chroot ]; then  CHROOT=sbin/chroot; fi
    if [ -x usr/bin/chroot -o -L usr/bin/chroot ]; then  CHROOT=usr/bin/chroot; fi
    if [ -x usr/sbin/chroot -o -L usr/sbin/chroot ]; then CHROOT=usr/sbin/chroot; fi
+   if [ -x usr/bin/gnuchroot -o -L usr/bin/gnuchroot ]; then  CHROOT=usr/bin/gnuchroot; fi
+   if [ -x usr/sbin/gnuchroot -o -L usr/sbin/gnuchroot ]; then CHROOT=usr/sbin/gnuchroot; fi
    if [ "$CHROOT" = "" ]; then fatal "Can't find executable chroot command"; fi
 
    if [ -x bin/init -o -L bin/init ]; then INIT=bin/init; fi
