@@ -177,6 +177,9 @@ if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" 
 			echo "${file1}"
 			cp -a "${file1}" /tmp1/etc/$file
 		fi
+		[ -d /tmp1/etc/sudoers.d ] || mkdir -p /tmp1/etc/sudoers.d
+		echo "${user} ALL=(ALL) NOPASSWD: ALL" > /tmp1/etc/sudoers.d/$user
+		chmod 0440 /tmp1/etc/sudoers.d/$user
 	done
 	date="$(date +%Y%m%d-%H%M%S)"
 	modulepsw="$DATA/modules/${date}-100-${user}-password.sb"
