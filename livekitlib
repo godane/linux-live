@@ -1368,7 +1368,7 @@ mount_bundles()
 				mknod $LOOPD b 7 $LOOPN
 			fi
 			losetup "$LOOPD" "$BUNDLES/$BUNDLE" -o $OFFSET
-			mount "$LOOPD" "$MNTBUNDLES/$BUN"
+			mount -o loop,ro -t squashfs "$LOOPD" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
             "$DFCMD" "$DFOPTION" "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
@@ -1409,7 +1409,7 @@ mount_bundles_modpath()
 				mknod $LOOPD b 7 $LOOPN
 			fi
 			losetup "$LOOPD" "$BUNDLES/$BUNDLE" -o $OFFSET
-			mount "$LOOPD" "$MNTBUNDLES/$BUN"
+			mount -o loop,ro -t squashfs "$LOOPD" "$MNTBUNDLES/$BUN"
          elif [ "$EXT" == "$DFBEXT" ]; then
             "$DFCMD" "$DFOPTION" "$BUNDLES/$BUNDLE" "$MNTBUNDLES/$BUN" -o readonly -o cachesize=$dfcachesize $DFMOUNTOPT
          elif [ "$EXT" == "$EFBEXT" ]; then
