@@ -379,7 +379,7 @@ setup_homeuser() {
 		chroot $UNION chpasswd < $UNION/tmp/chpasswd.tmp
 		debug_shell
 		rm -f $UNION/tmp/chpasswd.tmp
-		echo "${USER} ALL=(ALL) NOPASSWD: ALL" > $UNION/etc/sudoers.d/$USER
+		echo "${USER} ALL=(ALL) ALL" > $UNION/etc/sudoers.d/$USER
 		chmod 0440 $UNION/etc/sudoers.d/$USER
 		if [ -f "$UNION/home/${USER}/.xscreensaver" ]; then
 			if [ "$(grep -qs '^lock:' "$UNION/home/${USER}/.xscreensaver")" == "" ] ; then
@@ -422,6 +422,27 @@ setup_keyboard() {
       echo "setting keyboard to $KEYBOARD"
       chroot $UNION localectl set-keymap "$KEYBOARD"
    fi
+}
+
+# setup_desktop
+# $1 = desktop
+# $2 = union
+setup_desktop() {
+	local DESKTOP="$1"
+	local UNION="$2"
+	if [ "$DESKTOP" != "" ]; then
+		if [ "$DESTOP" == "xfce4" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startxfce4
+		elif [ "$DESKTOP" == "gnome" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/gnome-session
+		elif [ "$DESKTOP" == "kde" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startplasma-x11
+		elif [ "$DESKTOP" == "mate" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/mate-session
+		elif [ "$DESKTOP" == "openbox" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/openbox-session
+		fi
+	fi
 }
 
 # setup_timezone
