@@ -431,8 +431,16 @@ setup_desktop() {
 	local DESKTOP="$1"
 	local UNION="$2"
 	if [ "$DESKTOP" != "" ]; then
-		if [ "$DESTOP" == "xfce4" ]; then
+		if [ "$DESKTOP" == "xfce" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startxfce4
+		elif [ "$DESKTOP" == "cinnamon" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/cinnamon-session
+		elif [ "$DESKTOP" == "lxde" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startlxde
+		elif [ "$DESKTOP" == "lxqt" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startlxqt
+		elif [ "$DESKTOP" == "kodi" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/kodi-standalone
 		elif [ "$DESKTOP" == "gnome" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/gnome-session
 		elif [ "$DESKTOP" == "kde" ]; then
@@ -473,10 +481,10 @@ setup_autologin() {
 		echo "autologin-user=$USER" >> $UNION/etc/lightdm/lightdm.conf.d/01_${USER}.conf
 		echo "autologin-user-timeout=0" >> $UNION/etc/lightdm/lightdm.conf.d/01_${USER}.conf
 	fi
-	if [ -f $UNION/etc/sddm.conf.d/lubuntu_settings.conf ]; then
-		echo "[Autologin]" > $UNION/etc/sddm.conf.d/lubuntu_settings.conf
-		echo "Session=Lubuntu" >> $UNION/etc/sddm.conf.d/lubuntu_settings.conf
-		echo "User=$USER" >> $UNION/etc/sddm.conf.d/lubuntu_settings.conf
+	if [ ! -f $UNION/etc/sddm.conf.d/01_${USER}.conf ]; then
+		[ -d $UNION/etc/sddm.conf.d ] || mkdir -p $UNION/etc/sddm.conf.d
+		echo "[Autologin]" > $UNION/etc/sddm.conf.d/01_${USER}.conf
+		echo "User=$USER" >> $UNION/etc/sddm.conf.d/01_${USER}.conf
 	fi
 	if [ -f $UNION/etc/gdm3/custom.conf ]; then
 		cp $UNION/etc/gdm3/custom.conf $UNION/etc/gdm3/daemon.conf
