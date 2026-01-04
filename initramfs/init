@@ -164,6 +164,21 @@ setup_homeuser "$user" "$UNION"
 
 debug_shell
 
+if [ ! -z "$desktop" ]; then
+   setup_desktop "$desktop" "$UNION"
+fi
+
+debug_shell
+
+if [ ! -z "$rootpw" ]; then
+   echo "Setting up root password : $rootpw"
+   echo "root:$rootpw" > $UNION/tmp/chpasswd.tmp
+   chroot $UNION chpasswd < $UNION/tmp/chpasswd.tmp
+   rm $UNION/tmp/chpasswd.tmp
+fi
+
+debug_shell
+
 #copy the password files to /tmp1 if $home is used
 if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" ]; then
 	for file in group gshadow passwd shadow subgid subuid; do
@@ -178,7 +193,7 @@ if [ ! -z "$home" -a  ! -z "$user" -a "$(cat /proc/cmdline | grep perch)" == "" 
 			cp -a "${file1}" /tmp1/etc/$file
 		fi
 		[ -d /tmp1/etc/sudoers.d ] || mkdir -p /tmp1/etc/sudoers.d
-		echo "${user} ALL=(ALL) NOPASSWD: ALL" > /tmp1/etc/sudoers.d/$user
+		echo "${user} ALL=(ALL) ALL" > /tmp1/etc/sudoers.d/$user
 		chmod 0440 /tmp1/etc/sudoers.d/$user
 	done
 	date="$(date +%Y%m%d-%H%M%S)"
@@ -192,6 +207,12 @@ debug_shell
 
 if [ ! -z "$autologin" ]; then
 	setup_autologin "$user" "$UNION"
+	if [ ! -z "$desktop" ]; then
+		if [ -f $UNION/etc/sddm.conf.d/01_${user}.conf ]; then
+			sed -i 's|^Session=.*||g' $UNION/etc/sddm.conf.d/01_${user}.conf
+			echo "Session=$desktop" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+		fi
+	fi
 fi
 
 debug_shell
