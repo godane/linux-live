@@ -211,15 +211,31 @@ if [ ! -z "$autologin" ]; then
 		if [ -f $UNION/etc/sddm.conf.d/01_${user}.conf ]; then
 			sed -i 's|^Session=.*||g' $UNION/etc/sddm.conf.d/01_${user}.conf
 			if [ "$desktop" == "lxqt" ]; then
+				if [ -f $UNION/usr/share/xsessions/lxqt.desktop ]; then
+					echo "Session=lxqt" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				fi
+			elif [ "$desktop" == "lubuntu" ]; then
 				if [ -f $UNION/usr/share/xsessions/Lubuntu.desktop ]; then
 					echo "Session=Lubuntu" >> $UNION/etc/sddm.conf.d/01_${user}.conf
-				elif [ -f $UNION/usr/share/xsessions/lxqt.desktop ]; then
-					echo "Session=lxqt" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				fi
+			elif [ "$desktop" == "xfce" ]; then
+				if [ -f $UNION/usr/share/xsessions/xfce.desktop ]; then
+					echo "Session=xfce" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				fi
+			elif [ "$desktop" == "xubuntu" ]; then
+				if [ -f $UNION/usr/share/xsessions/xubuntu.desktop ]; then
+					echo "Session=xubuntu" >> $UNION/etc/sddm.conf.d/01_${user}.conf
 				fi
 			elif [ "$desktop" == "icewm" ]; then
 				echo "Session=icewm-session" >> $UNION/etc/sddm.conf.d/01_${user}.conf
 			elif [ "$desktop" == "lxde" ]; then
-				echo "Session=LXDE" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				if [ -f $UNION/usr/share/xsessions/LXDE.desktop ]; then
+					echo "Session=LXDE" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				fi
+			elif [ "$desktop" == "gnome-xorg" ]; then
+				if [ -f $UNION/usr/share/xsessions/gnome-xorg.desktop ]; then
+					echo "Session=gnome-xorg" >> $UNION/etc/sddm.conf.d/01_${user}.conf
+				fi
 			elif [ "$desktop" == "budgie" ]; then
 				echo "Session=budgie-desktop" >> $UNION/etc/sddm.conf.d/01_${user}.conf
 			elif [ "$desktop" == "kde" ]; then

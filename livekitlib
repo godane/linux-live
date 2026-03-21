@@ -431,7 +431,9 @@ setup_desktop() {
 	local DESKTOP="$1"
 	local UNION="$2"
 	if [ "$DESKTOP" != "" ]; then
-		if [ "$DESKTOP" == "xfce" -o "$DESKTOP" == "xubuntu" ]; then
+		if [ "$DESKTOP" == "xfce" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startxfce4
+		elif [ "$DESKTOP" == "xubuntu" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startxfce4
 		elif [ "$DESKTOP" == "cinnamon" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/cinnamon-session
@@ -441,7 +443,9 @@ setup_desktop() {
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/icewm-session
 		elif [ "$DESKTOP" == "lxde" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startlxde
-		elif [ "$DESKTOP" == "lxqt" -o "$DESKTOP" == "Lubuntu" ]; then
+		elif [ "$DESKTOP" == "lxqt" ]; then
+			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startlxqt
+		elif [ "$DESKTOP" == "lubuntu" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/startlxqt
 		elif [ "$DESKTOP" == "kodi" ]; then
 			chroot $UNION update-alternatives --quiet --set x-session-manager /usr/bin/kodi-standalone
