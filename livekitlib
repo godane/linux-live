@@ -300,7 +300,7 @@ init_union()
    if [ ! -z $forceaufs ]; then
       echo_green_star
       echo "Setting up empty union using aufs"
-      mount -t aufs -o br:"$1"=rw, aufs "$2"
+      mount -t aufs -o br:"$1"=rw aufs "$2"
    else
       echo_green_star
       echo "Setting up union using overlayfs"
@@ -1064,8 +1064,8 @@ restore_perch_session()
 
    # if last is empty or new/nonexistent is requested, create new
    if [ "$PERCHDIR" = "" -o "$PERCHDIR" = "new" -o ! -d "$CHANDIR/$PERCHDIR" ]; then
-      if [ "$LASTSEASON" != "" ]; then
-          NEW="$LASTSEASON"
+      if [ "$LASTSESSION" != "" ]; then
+          NEW="$LASTSESSION"
       else
           NEW="$(ls -1 $CHANDIR | egrep '^[0-9]' | sed -r 's/[^0-9].*//' | sort | tail -n 1)"
       fi
